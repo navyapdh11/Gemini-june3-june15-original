@@ -1,0 +1,13 @@
+services:
+  aastaclean-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: aastaclean:latest
+    container_name: aastaclean_service
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    restart: always

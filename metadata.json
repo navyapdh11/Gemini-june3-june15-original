@@ -1,0 +1,6 @@
+{
+  "name": "AASTACLEAN",
+  "description": "Premium National Enterprise Cleaning Services Australia-Wide. Connected modular landing page with integrated API connectors and CRM simulators.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

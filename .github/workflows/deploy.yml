@@ -1,0 +1,61 @@
+name: AASTACLEAN CI/CD Pipeline (Dokploy Automation)
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate-and-test:
+    name: Code Quality & Build Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Active Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-node: '22.x'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Code Verification (Lint)
+        run: npm run lint
+
+      - name: Production Bundle Verification (Compile Check)
+        run: npm run build
+
+  redeploy-to-dokploy:
+    name: Dokploy Trigger Deployment
+    needs: validate-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Dispatch Secure Webhook Request to Dokploy Panel
+        env:
+          DOKPLOY_WEBHOOK_URL: ${{ secrets.DOKPLOY_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DOKPLOY_WEBHOOK_URL" ]; then
+            echo "❌ Error: DOKPLOY_WEBHOOK_URL secret is not defined in GitHub Repository Secrets!"
+            echo "CI/CD Pipeline failed code deployment step."
+            exit 1
+          fi
+          
+          echo "🚀 Webhook payload transmission authorized. Initiating redeployment inside Dokploy..."
+          
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$DOKPLOY_WEBHOOK_URL")
+          
+          if [ "$RESPONSE" -eq 200 ] || [ "$RESPONSE" -eq 201 ]; then
+            echo "✓ Success: Dokploy received webhook trigger. Server code: $RESPONSE"
+          else
+            echo "❌ Error: Dokploy returned error response code: $RESPONSE"
+            exit 1
+          fi
