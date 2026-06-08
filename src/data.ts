@@ -2,6 +2,16 @@ import { ServiceItem, WebhookConfig } from "./types";
 
 export const allServices: ServiceItem[] = [
   {
+    name: "Regular Cleaning",
+    slug: "regular-cleaning",
+    icon: "🧹",
+    category: "Domestic",
+    description: "Routine maintenance for a clean, consistent living environment (Fantastic & Jim's style).",
+    baseRatePerHour: 45,
+    rating: 4.9,
+    durationEstimateHours: 3,
+  },
+  {
     name: "Commercial Cleaning",
     slug: "commercial-cleaning",
     icon: "🏢",
@@ -123,7 +133,7 @@ export const allServices: ServiceItem[] = [
   }
 ];
 
-export const demoPostcodes = ["6007", "2000", "3000", "4000", "5000", "6000", "7000", "8000"];
+export const demoPostcodes = ["6000", "6004", "6005", "6007", "6008", "6009", "6010", "6019", "6027", "6160", "6210", "2000", "3000", "4000", "5000", "7000", "8000"];
 
 export const defaultWebhookConfig: WebhookConfig = {
   webhookUrl: "https://api.aastaclean.com/v1/quotes",

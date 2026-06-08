@@ -33,6 +33,7 @@ interface IntegrationConsoleProps {
   onTriggerLog: (log: ConnectionLog) => void;
   logs: ConnectionLog[];
   onClearLogs: () => void;
+  initialActiveTab?: "webook-tester" | "rudderstack-cdp" | "chatwoot-inbox" | "payload-schema" | "payload-validator" | "twenty-crm" | "active-queues" | "crm-instructions" | "secured-gateway";
 }
 
 export default function IntegrationConsole({
@@ -40,12 +41,116 @@ export default function IntegrationConsole({
   onTriggerLog,
   logs,
   onClearLogs,
+  initialActiveTab,
 }: IntegrationConsoleProps) {
   const [config, setConfig] = useState<WebhookConfig>(defaultWebhookConfig);
-  const [activeTab, setActiveTab] = useState<"webook-tester" | "rudderstack-cdp" | "chatwoot-inbox" | "payload-schema" | "payload-validator" | "twenty-crm" | "crm-instructions">("webook-tester");
+  const [activeTab, setActiveTab] = useState<"webook-tester" | "rudderstack-cdp" | "chatwoot-inbox" | "payload-schema" | "payload-validator" | "twenty-crm" | "active-queues" | "crm-instructions" | "secured-gateway">(initialActiveTab || "webook-tester");
+
+  useEffect(() => {
+    if (initialActiveTab) {
+      setActiveTab(initialActiveTab);
+    }
+  }, [initialActiveTab]);
   const [isTesting, setIsTesting] = useState(false);
   const [customLogs, setCustomLogs] = useState<ConnectionLog[]>([]);
   const [copiedText, setCopiedText] = useState<string | null>(null);
+
+  // --- BACKGROUND QUEUE SYSTEM STATES ---
+  const [queueStats, setQueueStats] = useState<{
+    queueMode: "redis" | "memory";
+    isRedisConnected: boolean;
+    redisUrlUsed: string;
+    totals: { all: number; queued: number; active: number; completed: number; failed: number };
+  } | null>(null);
+  const [queueLogs, setQueueLogs] = useState<any[]>([]);
+  const [isQueueLoading, setIsQueueLoading] = useState(false);
+  const [manualQueueEvent, setManualQueueEvent] = useState("cdp_event");
+  const [manualQueuePayload, setManualQueuePayload] = useState<string>(`{
+  "eventName": "Manual Lead Trigger",
+  "properties": {
+    "siteCode": "AU-WA-6008",
+    "notes": "Buffered through standard BullMQ queue cluster",
+    "origin": "integration_portal"
+  }
+}`);
+
+  const fetchQueueData = async () => {
+    try {
+      const statsRes = await fetch("/api/v1/queue/stats");
+      const logsRes = await fetch("/api/v1/queue/logs");
+      if (statsRes.ok) {
+        const stats = await statsRes.json();
+        setQueueStats(stats);
+      }
+      if (logsRes.ok) {
+        const logsData = await logsRes.json();
+        setQueueLogs(logsData);
+      }
+    } catch (err) {
+      console.warn("Failed fetching active background queue statistics:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchQueueData();
+    const interval = setInterval(fetchQueueData, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleTriggerManualJob = async () => {
+    setIsQueueLoading(true);
+    let parsedData = {};
+    try {
+      parsedData = JSON.parse(manualQueuePayload);
+    } catch (e: any) {
+      onTriggerLog({
+        id: `queue_err_${Date.now()}`,
+        type: "system",
+        status: "error",
+        message: `⚠️ Queue Dispatch: Invalid JSON compilation. ${e.message}`,
+        timestamp: new Date().toLocaleTimeString()
+      });
+      setIsQueueLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/v1/queue/test-job", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: manualQueueEvent, data: parsedData })
+      });
+
+      if (res.ok) {
+        const bodyObj = await res.json();
+        onTriggerLog({
+          id: `queue_dispatch_${Date.now()}`,
+          type: "system",
+          status: "success",
+          message: `📦 [Queue Buffer] Task dispatched. JobID: ${bodyObj.jobId}`,
+          timestamp: new Date().toLocaleTimeString(),
+          payload: {
+            assignedJobId: bodyObj.jobId,
+            queueType: queueStats?.queueMode === "redis" ? "Redis + BullMQ Cluster" : "In-Memory EventLoop (Local Preview Mode)",
+            payloadBuffered: parsedData
+          }
+        });
+        await fetchQueueData();
+      } else {
+        throw new Error(`Server returned status ${res.status}`);
+      }
+    } catch (err: any) {
+      onTriggerLog({
+        id: `queue_err_${Date.now()}`,
+        type: "system",
+        status: "error",
+        message: `❌ Queue trigger failure: ${err.message}`,
+        timestamp: new Date().toLocaleTimeString()
+      });
+    } finally {
+      setIsQueueLoading(false);
+    }
+  };
 
   // --- NEW INTEGRATIONS STATE VARIABLES (PHASE 1 FOUNDATION) ---
   
@@ -143,6 +248,87 @@ export default function IntegrationConsole({
     }
     setTwentyLeads(unique);
   }, [latestQuotes]);
+
+  // SECURED GATEWAY CONFIG STATE (AES-256 Cloud Proxy Configuration)
+  const [secureGatewayConfig, setSecureGatewayConfig] = useState({
+    payloadCmsUrl: "https://payload.aastaclean.com.au",
+    payloadToken: "",
+    twentyCmsUrl: "https://twenty.aastaclean.com.au",
+    twentyToken: "",
+    chatwootUrl: "https://chatwoot.aastaclean.com.au",
+    chatwootToken: ""
+  });
+  const [isSavingKeys, setIsSavingKeys] = useState(false);
+
+  // Load Secure Credentials Masked state from Node Node.js API Gateway on activeTab toggle or component mount
+  useEffect(() => {
+    if (activeTab === "secured-gateway") {
+      fetch("/api/admin/integrations/config")
+        .then((res) => {
+          if (!res.ok) throw new Error("Credentials gateway returned an error state.");
+          return res.json();
+        })
+        .then((data) => {
+          setSecureGatewayConfig({
+            payloadCmsUrl: data.payloadCmsUrl || "",
+            payloadToken: data.payloadTokenMasked || "",
+            twentyCmsUrl: data.twentyCmsUrl || "",
+            twentyToken: data.twentyTokenMasked || "",
+            chatwootUrl: data.chatwootUrl || "",
+            chatwootToken: data.chatwootTokenMasked || ""
+          });
+          onTriggerLog({
+            id: `secret_load_${Date.now()}`,
+            type: "system",
+            status: "info",
+            message: `🔐 Secure Gateway: API credentials fetched. Encrypted Secrets are masked safe in browser view.`,
+            timestamp: new Date().toLocaleTimeString(),
+          });
+        })
+        .catch((err) => {
+          onTriggerLog({
+            id: `secret_err_${Date.now()}`,
+            type: "system",
+            status: "warning",
+            message: `🔒 Secure Gateway loading issue: ${err.message}. Defaulting to visual proxies.`,
+            timestamp: new Date().toLocaleTimeString(),
+          });
+        });
+    }
+  }, [activeTab]);
+
+  const handleSaveSecureKeys = () => {
+    setIsSavingKeys(true);
+    fetch("/api/admin/integrations/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(secureGatewayConfig)
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Could not update secure server proxy registry.");
+        return res.json();
+      })
+      .then((data) => {
+        onTriggerLog({
+          id: `secret_save_${Date.now()}`,
+          type: "system",
+          status: "success",
+          message: `🛡️ LOCK SECURE: Secret Keys locked using AES-256 standard and synchronized on server Node.`,
+          timestamp: new Date().toLocaleTimeString(),
+        });
+        setIsSavingKeys(false);
+      })
+      .catch((err) => {
+        onTriggerLog({
+          id: `secret_save_err_${Date.now()}`,
+          type: "system",
+          status: "error",
+          message: `⚠️ Gateway update failure: ${err.message}`,
+          timestamp: new Date().toLocaleTimeString(),
+        });
+        setIsSavingKeys(false);
+      });
+  };
 
   // --- INTEGRATION LOGIC HANDLERS (PHASES 1 & 2 PIPELINES) ---
 
@@ -526,6 +712,7 @@ export const ${payloadCollection.charAt(0).toUpperCase() + payloadCollection.sli
     const mockLead: QuoteRequest = {
       id: `lead_${Math.floor(Math.random() * 900000 + 100000)}`,
       postcode: ["6007", "2000", "3000", "4000"][Math.floor(Math.random() * 4)],
+      propertyType: ["Apartment", "Townhouse", "Standalone House"][Math.floor(Math.random() * 3)],
       serviceName: allServices[Math.floor(Math.random() * allServices.length)].name,
       name: ["Johnathan Fletcher", "Olivia Henderson", "Amir Patel", "Chloe Vance"][Math.floor(Math.random() * 4)],
       email: "sandbox@aastaclean-crm.au",
@@ -708,7 +895,7 @@ export const ${payloadCollection.charAt(0).toUpperCase() + payloadCollection.sli
                 <Database className="w-5 h-5 text-indigo-400" /> Connection Parameters
               </h3>
               <div className="flex gap-1.5 flex-wrap">
-                {(["webook-tester", "rudderstack-cdp", "chatwoot-inbox", "payload-schema", "payload-validator", "twenty-crm", "crm-instructions"] as const).map((tab) => (
+                {(["webook-tester", "rudderstack-cdp", "chatwoot-inbox", "payload-schema", "payload-validator", "twenty-crm", "active-queues", "crm-instructions", "secured-gateway"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -730,7 +917,11 @@ export const ${payloadCollection.charAt(0).toUpperCase() + payloadCollection.sli
                       ? "Validation CLI"
                       : tab === "twenty-crm"
                       ? "Twenty CRM"
-                      : "Setup Info"}
+                      : tab === "active-queues"
+                      ? "Task Queues"
+                      : tab === "crm-instructions"
+                      ? "Setup Info"
+                      : "🔒 Secured Gateway"}
                   </button>
                 ))}
               </div>
@@ -1365,6 +1556,195 @@ export const ${payloadCollection.charAt(0).toUpperCase() + payloadCollection.sli
               </div>
             )}
 
+            {activeTab === "active-queues" && (
+              <div className="space-y-6">
+                {/* Header Status Bar */}
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="font-extrabold text-white text-base">Active Buffer Queue Orchestration</h4>
+                      <p className="text-xs text-slate-400 mt-1">High-throughput task worker pool powered by BullMQ & Redis.</p>
+                    </div>
+                    <div>
+                      {queueStats?.queueMode === "redis" ? (
+                        <span className="px-3 py-1.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] uppercase tracking-wider rounded-full inline-flex items-center gap-1.5 animate-pulse shrink-0">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                          Upstash / Redis Cluster Online
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 font-bold text-[10px] uppercase tracking-wider rounded-full inline-flex items-center gap-1.5 shrink-0">
+                          <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                          Local In-Memory EventLoop (Preview)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Stats Tiles */}
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                    <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Total Jobs</span>
+                      <span className="text-xl font-bold font-mono text-slate-100">{queueStats?.totals?.all ?? 0}</span>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-805 p-3 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Queued</span>
+                      <span className="text-xl font-bold font-mono text-yellow-400">{queueStats?.totals?.queued ?? 0}</span>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Processing</span>
+                      <span className="text-xl font-bold font-mono text-indigo-400 animate-pulse">{queueStats?.totals?.active ?? 0}</span>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Completed</span>
+                      <span className="text-xl font-bold font-mono text-emerald-400">{queueStats?.totals?.completed ?? 0}</span>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Failed</span>
+                      <span className="text-xl font-bold font-mono text-red-400">{queueStats?.totals?.failed ?? 0}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Main Queue Manual Trigger Form */}
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
+                  <h5 className="font-extrabold text-white text-xs uppercase tracking-widest flex items-center gap-1.5">
+                    <Zap className="w-4 h-4 text-amber-400" /> Direct Job Ingestion Gateway
+                  </h5>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Background Worker Task</label>
+                      <select
+                        value={manualQueueEvent}
+                        onChange={(e) => {
+                          setManualQueueEvent(e.target.value);
+                          if (e.target.value === "cdp_event") {
+                            setManualQueuePayload(JSON.stringify({
+                              eventName: "Manual Customer Dispatch Trigger",
+                              properties: {
+                                postcode: "6007",
+                                selectedAddonsCount: 2,
+                                totalAmount: 480
+                              }
+                            }, null, 2));
+                          } else {
+                            setManualQueuePayload(JSON.stringify({
+                              bookingId: "aas_bk_926600",
+                              clientName: "David Grohl",
+                              email: "dave@grohl-studios.com.au",
+                              phone: "0499 123 456",
+                              serviceName: "Pressure Cleaning",
+                              totalAmount: 480
+                            }, null, 2));
+                          }
+                        }}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500 font-bold"
+                      >
+                        <option value="cdp_event">cdp_event (Segment / RudderStack webhook dispatch)</option>
+                        <option value="dispatch_notice">dispatch_notice (Automated SMS & Email notice worker)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Job Options / Operational Mode</label>
+                      <div className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-400 flex items-center justify-between">
+                        <span className="font-medium">Exponential Backoff / Retry:</span>
+                        <span className="font-mono text-indigo-400 font-extrabold">3 attempts @ 2s delay</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-2">Enqueue Task Parameters Context Payload</label>
+                    <textarea
+                      value={manualQueuePayload}
+                      onChange={(e) => setManualQueuePayload(e.target.value)}
+                      className="w-full h-28 bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] font-mono text-teal-300 focus:border-indigo-500 outline-none"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleTriggerManualJob}
+                    disabled={isQueueLoading}
+                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold uppercase text-xs tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    {isQueueLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current text-white" />}
+                    <span>{isQueueLoading ? "Offloading Job to Redis Buffer..." : "Enqueue Background Job in BullMQ Cluster"}</span>
+                  </button>
+                </div>
+
+                {/* Cloud Workflow Orchestrator (Crawl-Walk-Run Info and Temporal Cloud Mapping) */}
+                <div className="bg-indigo-950/20 border border-indigo-500/20 p-5 rounded-2xl space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-indigo-500/10 rounded-lg border border-indigo-500/20 shrink-0">
+                      <Layers className="w-5 h-5 text-indigo-400" />
+                    </div>
+                    <div>
+                      <h5 className="font-extrabold text-white text-xs uppercase tracking-wider">🔄 Advanced Dispatch Orchestration Strategy</h5>
+                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                        Currently, <strong>Redis + BullMQ</strong> buffers lightning-fast telemetry (Segment, RudderStack) and transactional alerts. For high-reliability, long-running regional dispatch matching (which takes 2-4 hours, escalates to cleaner backups, and operates multi-stage workflows), our roadmap seamlessly ports these stateful pathways to <strong>Temporal Cloud</strong>.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] bg-slate-950/45 p-3.5 rounded-xl border border-slate-850">
+                    <div className="space-y-1">
+                      <span className="font-bold text-slate-200 block">⚡ BullMQ Queue Target Jobs:</span>
+                      <span className="text-slate-400">- Segment / RudderStack telemetries</span>
+                      <span className="text-slate-400 block">- Immediate CRM lead synchronization</span>
+                      <span className="text-slate-400 block">- Instant confirmation SMS trigger hooks</span>
+                    </div>
+                    <div className="space-y-1 border-t sm:border-t-0 sm:border-l border-slate-800 pt-2 sm:pt-0 sm:pl-3">
+                      <span className="font-bold text-indigo-400 block">⚙️ Temporal Workflow Pipeline:</span>
+                      <span className="text-slate-400">- 4-hour cleaner regional bidding checks</span>
+                      <span className="text-slate-400 block">- Complex conditional escalation logic</span>
+                      <span className="text-slate-400 block">- Guaranteed state preservation through crashes</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Queue History Log stream */}
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-3">
+                  <h5 className="font-extrabold text-white text-xs uppercase tracking-widest">📋 Real-Time Background Worker Log Stream</h5>
+                  <div className="max-h-56 overflow-y-auto space-y-2 pr-1.5 custom-scrollbar">
+                    {queueLogs.length === 0 ? (
+                      <div className="text-center py-8 text-xs text-slate-500 italic">
+                        No active queue jobs buffered in log registry. Try submitting a pricing quote on the site or firing a test job above to verify worker state!
+                      </div>
+                    ) : (
+                      queueLogs.map((log) => {
+                        const isCompleted = log.status === "completed";
+                        const isFailed = log.status === "failed";
+                        const isActive = log.status === "active";
+                        return (
+                          <div key={log.id} className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5 text-xs">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full ${isCompleted ? "bg-emerald-500" : isFailed ? "bg-red-500 animate-pulse" : isActive ? "bg-indigo-500 animate-pulse" : "bg-slate-500"}`} />
+                                <span className="font-extrabold text-slate-100 italic">job: "{log.jobName}"</span>
+                              </div>
+                              <span className="text-[10px] text-slate-500 font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-between text-[10px] text-slate-400 gap-2">
+                              <span>Queue Provider: <span className="text-slate-300 font-mono font-semibold">[{log.queueType}]</span></span>
+                              <span className="font-mono">ID: {log.id}</span>
+                            </div>
+
+                            {/* Job Details Preview */}
+                            <div className="bg-slate-900 border border-slate-800/60 p-2.5 rounded-lg space-y-1 text-[10px] font-mono">
+                              <div className="text-indigo-300">Payload: <span className="text-slate-400 font-sans">{JSON.stringify(log.payload)}</span></div>
+                              {log.result && <div className="text-emerald-400">Result: <span className="text-slate-300 font-sans">{JSON.stringify(log.result)}</span></div>}
+                              {log.error && <div className="text-red-400">Error: <span className="text-red-300 font-sans">{log.error}</span></div>}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeTab === "crm-instructions" && (
               <div className="space-y-4 text-xs sm:text-sm text-slate-300 leading-relaxed p-4 bg-slate-900 rounded-3xl border border-slate-800">
                 <h4 className="font-extrabold text-white text-base">Ingestion Instructions</h4>
@@ -1378,6 +1758,108 @@ export const ${payloadCollection.charAt(0).toUpperCase() + payloadCollection.sli
                   <p>
                     <strong>3. Cleaners app & custom CRM:</strong> Include verification credentials in headers. Our system supports token checks to maintain authenticated API access security.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "secured-gateway" && (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="bg-slate-900/60 p-4.5 rounded-2xl border border-indigo-500/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-extrabold text-white text-sm">🔒 AES-256 Unified Enterprise Key Manager</h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Encrypts and anchors private authorization secrets in our secure cloud node server.</p>
+                  </div>
+                  <span className="self-start sm:self-auto text-[10px] bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-mono font-bold px-2 py-0.5 rounded">
+                    RSA / AES Hybrid
+                  </span>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
+                  <h5 className="text-xs font-black uppercase text-slate-400 tracking-wider">Configure Microservice Cluster Endpoints</h5>
+                  
+                  <div className="space-y-4">
+                    {/* PAYLOAD CMS */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pb-4 border-b border-slate-800/60">
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Payload CMS Host URL</label>
+                        <input
+                          type="text"
+                          value={secureGatewayConfig.payloadCmsUrl}
+                          onChange={(e) => setSecureGatewayConfig({...secureGatewayConfig, payloadCmsUrl: e.target.value})}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-indigo-300 focus:border-indigo-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Private Authorization Secret Key / Token</label>
+                        <input
+                          type="password"
+                          value={secureGatewayConfig.payloadToken}
+                          onChange={(e) => setSecureGatewayConfig({...secureGatewayConfig, payloadToken: e.target.value})}
+                          placeholder="••••••••••••••••••••••••"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-indigo-300 focus:border-indigo-500 outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* TWENTY CRM */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pb-4 border-b border-slate-800/60">
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Twenty CRM API URL (GraphQL Endpoint)</label>
+                        <input
+                          type="text"
+                          value={secureGatewayConfig.twentyCmsUrl}
+                          onChange={(e) => setSecureGatewayConfig({...secureGatewayConfig, twentyCmsUrl: e.target.value})}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-indigo-300 focus:border-indigo-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Twenty API Access Secret Key / PAT</label>
+                        <input
+                          type="password"
+                          value={secureGatewayConfig.twentyToken}
+                          onChange={(e) => setSecureGatewayConfig({...secureGatewayConfig, twentyToken: e.target.value})}
+                          placeholder="••••••••••••••••••••••••"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-indigo-300 focus:border-indigo-500 outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* CHATWOOT */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Chatwoot Client API Host URL</label>
+                        <input
+                          type="text"
+                          value={secureGatewayConfig.chatwootUrl}
+                          onChange={(e) => setSecureGatewayConfig({...secureGatewayConfig, chatwootUrl: e.target.value})}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-indigo-300 focus:border-indigo-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Chatwoot Private Access Token</label>
+                        <input
+                          type="password"
+                          value={secureGatewayConfig.chatwootToken}
+                          onChange={(e) => setSecureGatewayConfig({...secureGatewayConfig, chatwootToken: e.target.value})}
+                          placeholder="••••••••••••••••••••••••"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-indigo-300 focus:border-indigo-500 outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSaveSecureKeys}
+                    disabled={isSavingKeys}
+                    className="w-full mt-4 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold uppercase text-xs tracking-widest flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    {isSavingKeys ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4 text-emerald-100 fill-current" />}
+                    <span>{isSavingKeys ? "Encrypting and syncing keys..." : "Lock & Sync Keys on Express Core"}</span>
+                  </button>
+                </div>
+
+                <div className="bg-indigo-950/20 border border-indigo-500/20 p-4.5 rounded-2xl text-[11px] text-indigo-350 leading-relaxed font-sans">
+                  <strong>🔒 Advanced Cryptography Protection:</strong> High-security credential storage automatically converts plaintext keys into <code>AES-256-CBC</code> cryptograms immediately upon ingestion on the Node virtual machine. Decryption happens safely memory-only during proxy fetch handshakes, shielding your raw API keys from ever leaking on any public network, browser viewport, or developer browser logs.
                 </div>
               </div>
             )}

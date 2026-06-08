@@ -28,6 +28,7 @@ import { ServiceItem, PostcodeCoverage, StateCoverage } from "../types";
 import { subserviceRegistry, defaultSubservices, addonRegistry } from "../servicesCatalog";
 import { SERVICE_METADATA } from "../config/ServiceCatalog";
 import { calculateQuote } from "../utils/PricingCalculator";
+import { safeLocalStorage as localStorage } from "../utils/storageFallback";
 
 interface PricingCalculatorProps {
   onOpenQuote: (service?: string) => void;
@@ -39,6 +40,29 @@ interface PricingCalculatorProps {
   isUrgentActive?: boolean;
   minHoursLimit?: number;
 }
+
+const formatItemName = (item: string) => {
+  const overrides: Record<string, { label: string; icon: string }> = {
+    armchair: { label: "Armchair", icon: "🛋️" },
+    sofaSeat: { label: "Sofa Seat", icon: "🛋️" },
+    diningChair: { label: "Dining Chair", icon: "🪑" },
+    mattress: { label: "Mattress" , icon: "🛏️" },
+    singlePane: { label: "Single Pane", icon: "🪟" },
+    doublePane: { label: "Double Pane", icon: "🪟" },
+    slidingDoor: { label: "Sliding Door", icon: "🚪" },
+    glassBalustrade: { label: "Glass Balustrade", icon: "💎" },
+    skylight: { label: "Skylight Panel", icon: "☀️" },
+    flyScreen: { label: "Fly Screen", icon: "🕸️" },
+  };
+
+  if (overrides[item]) {
+    return overrides[item];
+  }
+
+  const spaced = item.replace(/([A-Z])/g, " $1");
+  const capitalized = spaced.charAt(0).toUpperCase() + spaced.slice(1);
+  return { label: capitalized, icon: "✨" };
+};
 
 export default function PricingCalculator({ 
   onOpenQuote, 
@@ -57,6 +81,7 @@ export default function PricingCalculator({
   const [selectedMetadataId, setSelectedMetadataId] = useState<string>("end-of-lease");
   const [metadataSubservice, setMetadataSubservice] = useState<string>("");
   const [metadataAddons, setMetadataAddons] = useState<string[]>([]);
+  const [metadataAddonQuantities, setMetadataAddonQuantities] = useState<Record<string, number>>({});
   const [metadataHours, setMetadataHours] = useState<number>(4);
   const [metadataPropertyType, setMetadataPropertyType] = useState<string>("2br");
   const [metadataSqm, setMetadataSqm] = useState<number>(85);
@@ -70,7 +95,13 @@ export default function PricingCalculator({
     armchair: 1,
     sofaSeat: 3,
     diningChair: 4,
-    mattress: 1
+    mattress: 1,
+    singlePane: 10,
+    doublePane: 4,
+    slidingDoor: 2,
+    glassBalustrade: 0,
+    skylight: 0,
+    flyScreen: 0
   });
 
   // Automatically sync initial sub-services when switching main metadata services
@@ -83,6 +114,7 @@ export default function PricingCalculator({
         setMetadataSubservice("");
       }
       setMetadataAddons([]);
+      setMetadataAddonQuantities({});
     }
   }, [selectedMetadataId]);
 
@@ -119,6 +151,7 @@ export default function PricingCalculator({
   // Subservice Tiers & Add-ons
   const [selectedSubserviceSlug, setSelectedSubserviceSlug] = useState<string>("");
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
+  const [standardAddonQuantities, setStandardAddonQuantities] = useState<Record<string, number>>({});
 
   const activeService = services.find(s => s.slug === selectedServiceSlug) || services[0] || allServices[0];
 
@@ -136,6 +169,7 @@ export default function PricingCalculator({
     }
     // De-select add-ons that aren't valid for the new service category
     setSelectedAddonIds([]);
+    setStandardAddonQuantities({});
   }, [selectedServiceSlug]);
 
   // Generate intelligent recommended duration & sync slider base hours
@@ -290,22 +324,29 @@ export default function PricingCalculator({
 
   // Addons calculations list
   const selectedAddonsDetails = activeAddons.filter(a => selectedAddonIds.includes(a.id));
-  const addonsTotal = selectedAddonsDetails.reduce((sum, current) => sum + current.price, 0);
+  const addonsTotal = selectedAddonsDetails.reduce((sum, current) => {
+    const qty = standardAddonQuantities[current.id] || 1;
+    return sum + (current.price * qty);
+  }, 0);
 
   // Metadata calculations
   let metaBaseAndAddonsTotal = 0;
   const activeMetadata = SERVICE_METADATA[selectedMetadataId];
 
   if (useMetadataEngine && activeMetadata) {
-    let inputData: any = { addons: metadataAddons };
+    const expandedAddons = metadataAddons.flatMap(name => {
+      const qty = metadataAddonQuantities[name] || 1;
+      return Array(qty).fill(name);
+    });
+    let inputData: any = { addons: expandedAddons };
     if (activeMetadata.model === "hourly") {
       inputData.hours = metadataHours;
     } else if (activeMetadata.model === "fixed") {
       inputData.propertyType = metadataPropertyType;
     } else if (activeMetadata.model === "per_room") {
-      inputData = { ...metadataRoomCounters, addons: metadataAddons };
+      inputData = { ...metadataRoomCounters, addons: expandedAddons };
     } else if (activeMetadata.model === "per_item") {
-      inputData = { ...metadataItemCounters, addons: metadataAddons };
+      inputData = { ...metadataItemCounters, addons: expandedAddons };
     } else if (activeMetadata.model === "sqm") {
       inputData.sqm = metadataSqm;
     }
@@ -341,10 +382,17 @@ export default function PricingCalculator({
   // Toggle addons
   const handleToggleAddon = (id: string) => {
     let nextAddons = [...selectedAddonIds];
-    if (nextAddons.includes(id)) {
+    const isSelected = nextAddons.includes(id);
+    if (isSelected) {
       nextAddons = nextAddons.filter(a => a !== id);
+      setStandardAddonQuantities(p => {
+        const copy = { ...p };
+        delete copy[id];
+        return copy;
+      });
     } else {
       nextAddons.push(id);
+      setStandardAddonQuantities(p => ({ ...p, [id]: 1 }));
     }
     setSelectedAddonIds(nextAddons);
 
@@ -355,6 +403,51 @@ export default function PricingCalculator({
       status: "info",
       message: `➕ Modified optional addon toggle: "${addon?.name}" ($${addon?.price} AUD) in selection roster`,
       timestamp: new Date().toLocaleTimeString(),
+    });
+  };
+
+  const handleUpdateStandardAddonQuantity = (id: string, delta: number) => {
+    setStandardAddonQuantities((prev) => {
+      const currentQty = prev[id] || 1;
+      const newQty = currentQty + delta;
+      if (newQty <= 0) {
+        setSelectedAddonIds(prevIds => prevIds.filter(a => a !== id));
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      }
+      return { ...prev, [id]: newQty };
+    });
+  };
+
+  const handleToggleMetadataAddon = (add: string) => {
+    let nextAddons = [...metadataAddons];
+    const isSelected = nextAddons.includes(add);
+    if (isSelected) {
+      nextAddons = nextAddons.filter(a => a !== add);
+      setMetadataAddonQuantities(p => {
+        const copy = { ...p };
+        delete copy[add];
+        return copy;
+      });
+    } else {
+      nextAddons.push(add);
+      setMetadataAddonQuantities(p => ({ ...p, [add]: 1 }));
+    }
+    setMetadataAddons(nextAddons);
+  };
+
+  const handleUpdateMetadataAddonQuantity = (add: string, delta: number) => {
+    setMetadataAddonQuantities((prev) => {
+      const currentQty = prev[add] || 1;
+      const newQty = currentQty + delta;
+      if (newQty <= 0) {
+        setMetadataAddons(prevAdds => prevAdds.filter(a => a !== add));
+        const copy = { ...prev };
+        delete copy[add];
+        return copy;
+      }
+      return { ...prev, [add]: newQty };
     });
   };
 
@@ -370,7 +463,12 @@ export default function PricingCalculator({
           subserviceName: metadataSubservice || "Standard",
           bedroomCount: activeMetadata.model === "per_room" ? metadataRoomCounters.bedroom : undefined,
           bathroomCount: activeMetadata.model === "per_room" ? (metadataRoomCounters.bathroom || 1) : undefined,
-          selectedAddons: metadataAddons.map(addonName => ({ name: addonName, price: activeMetadata.addonPrices?.[addonName] || 0, icon: "✨" })),
+          selectedAddons: metadataAddons.map(addonName => ({ 
+            name: addonName, 
+            price: activeMetadata.addonPrices?.[addonName] || 0, 
+            quantity: metadataAddonQuantities[addonName] || 1,
+            icon: "✨" 
+          })),
           calculatedTotal: calculatedTotal,
           metadataModel: activeMetadata.model
         }
@@ -385,7 +483,12 @@ export default function PricingCalculator({
           bathroomCount: activeService.category === "Domestic" ? bathrooms : undefined,
           deskCount: activeService.category === "Commercial" ? deskCount : undefined,
           communalCount: activeService.category === "Commercial" ? communalCount : undefined,
-          selectedAddons: selectedAddonsDetails.map(a => ({ name: a.name, price: a.price, icon: a.icon })),
+          selectedAddons: selectedAddonsDetails.map(a => ({ 
+            name: a.name, 
+            price: a.price, 
+            quantity: standardAddonQuantities[a.id] || 1,
+            icon: a.icon 
+          })),
           calculatedTotal: calculatedTotal
         };
 
@@ -485,7 +588,7 @@ export default function PricingCalculator({
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
                     {Object.entries(SERVICE_METADATA).map(([key, item]) => {
                       const isSelected = selectedMetadataId === key;
-                      const icon = key === "regular-cleaning" ? "🧹" : key === "end-of-lease" ? "🔑" : key === "carpet-cleaning" ? "🧹" : key === "pressure-cleaning" ? "💦" : key === "upholstery-furniture" ? "🛋️" : "🏗️";
+                      const icon = key === "regular-cleaning" ? "🧹" : key === "end-of-lease" ? "🔑" : key === "carpet-cleaning" ? "🧹" : key === "pressure-cleaning" ? "💦" : key === "upholstery-furniture" ? "🛋️" : key === "window-cleaning" ? "🪟" : "🏗️";
                       return (
                         <button
                           key={key}
@@ -640,10 +743,13 @@ export default function PricingCalculator({
                     <div className="grid grid-cols-2 gap-3">
                       {Object.keys(activeMetadata.pricing || {}).map((item) => {
                         const count = metadataItemCounters[item] || 0;
+                        const info = formatItemName(item);
                         return (
                           <div key={item} className="bg-white p-3 rounded-2xl border border-slate-205 flex items-center justify-between shadow-xs">
                             <div className="min-w-0 pr-1">
-                              <span className="text-[11px] font-extrabold text-slate-700 capitalize block truncate">{item.replace("Seat", " Seat")}</span>
+                              <span className="text-[11px] font-extrabold text-slate-700 block truncate">
+                                <span className="mr-1">{info.icon}</span>{info.label}
+                              </span>
                               <span className="block text-[9px] text-slate-400 font-mono font-semibold">+${activeMetadata.pricing?.[item]}/each</span>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
@@ -711,31 +817,30 @@ export default function PricingCalculator({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {activeMetadata.addons.map((add) => {
                         const isSelected = metadataAddons.includes(add);
+                        const qty = metadataAddonQuantities[add] || 0;
                         const price = activeMetadata.addonPrices?.[add] || 0;
                         return (
-                          <button
+                          <div
                             key={add}
-                            type="button"
-                            onClick={() => {
-                              const updated = isSelected
-                                ? metadataAddons.filter((a) => a !== add)
-                                : [...metadataAddons, add];
-                              setMetadataAddons(updated);
-                              onTriggerLog({
-                                id: `meta_addon_toggle_${add}_${Date.now()}`,
-                                type: "system",
-                                status: "info",
-                                message: `➕ Swapped catalog addon toggle: "${add}" (+$${price} AUD)`,
-                                timestamp: new Date().toLocaleTimeString(),
-                              });
-                            }}
-                            className={`p-3 rounded-2xl border text-left flex items-start justify-between gap-3 transition-all cursor-pointer relative hover:border-slate-300 ${
+                            className={`p-3 rounded-2xl border text-left flex items-center justify-between gap-3 transition-all relative hover:border-slate-300 ${
                               isSelected
-                                ? "bg-indigo-50 border-indigo-400 shadow-xs"
+                                ? "bg-indigo-50/50 border-indigo-405 shadow-xs text-slate-800"
                                 : "bg-white border-slate-200 text-slate-600"
                             }`}
                           >
-                            <div className="min-w-0 pr-2">
+                            <div 
+                              onClick={() => {
+                                handleToggleMetadataAddon(add);
+                                onTriggerLog({
+                                  id: `meta_addon_toggle_${add}_${Date.now()}`,
+                                  type: "system",
+                                  status: "info",
+                                  message: `➕ Swapped catalog addon toggle: "${add}" (+$${price} AUD)`,
+                                  timestamp: new Date().toLocaleTimeString(),
+                                });
+                              }}
+                              className="grow min-w-0 pr-2 cursor-pointer select-none"
+                            >
                               <div className="font-extrabold text-[11px] text-slate-800 leading-tight">
                                 {add}
                               </div>
@@ -743,12 +848,46 @@ export default function PricingCalculator({
                                 +${price} AUD
                               </span>
                             </div>
-                            <div className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center transition-all ${
-                              isSelected ? "bg-indigo-600 border-indigo-650 text-white" : "border-slate-300 bg-slate-50"
-                            }`}>
-                              {isSelected && <Check className="w-2 h-2 stroke-[3]" />}
-                            </div>
-                          </button>
+
+                            {isSelected ? (
+                              <div className="flex items-center gap-1 shrink-0 bg-white border border-indigo-200 rounded-lg p-0.5 shadow-xs">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateMetadataAddonQuantity(add, -1)}
+                                  className="w-4.5 h-4.5 rounded flex items-center justify-center bg-slate-50 hover:bg-indigo-100 text-indigo-900 font-extrabold transition-colors cursor-pointer"
+                                >
+                                  <Minus className="w-2.5 h-2.5 stroke-[3]" />
+                                </button>
+                                <span className="px-1 text-[10.5px] font-black text-indigo-950 font-mono w-4 text-center">
+                                  {qty || 1}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateMetadataAddonQuantity(add, 1)}
+                                  className="w-4.5 h-4.5 rounded flex items-center justify-center bg-slate-50 hover:bg-indigo-100 text-indigo-900 font-extrabold transition-colors cursor-pointer"
+                                >
+                                  <Plus className="w-2.5 h-2.5 stroke-[3]" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleToggleMetadataAddon(add);
+                                  onTriggerLog({
+                                    id: `meta_addon_toggle_${add}_${Date.now()}`,
+                                    type: "system",
+                                    status: "info",
+                                    message: `➕ Swapped catalog addon toggle: "${add}" (+$${price} AUD)`,
+                                    timestamp: new Date().toLocaleTimeString(),
+                                  });
+                                }}
+                                className="text-[10px] font-black shrink-0 px-2 py-0.5 rounded font-mono bg-slate-50 text-indigo-800 border border-indigo-100 hover:bg-indigo-50 cursor-pointer transition-colors"
+                              >
+                                +${price}
+                              </button>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -1111,33 +1250,60 @@ export default function PricingCalculator({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {activeAddons.map((addon) => {
                     const isSelected = selectedAddonIds.includes(addon.id);
+                    const qty = standardAddonQuantities[addon.id] || 0;
                     return (
-                      <button
+                      <div
                         key={addon.id}
-                        type="button"
-                        onClick={() => handleToggleAddon(addon.id)}
-                        className={`p-4 rounded-2xl border text-left flex items-start gap-3 transition-all cursor-pointer hover:border-slate-300 relative ${
+                        className={`p-4 rounded-2xl border text-left flex items-start gap-2.5 transition-all relative hover:border-slate-300 ${
                           isSelected 
-                            ? "bg-gradient-to-br from-indigo-500/5 to-indigo-500/10 border-indigo-500/80 shadow-sm text-slate-800"
+                            ? "bg-indigo-50/50 border-indigo-400 shadow-sm text-slate-800"
                             : "bg-white border-slate-150 text-slate-600"
                         }`}
                       >
                         <span className="text-2xl mt-0.5 select-none">{addon.icon}</span>
-                        <div className="space-y-1">
-                          <div className="font-bold text-xs pr-12 text-slate-800 leading-snug">{addon.name}</div>
+                        <div className="space-y-1 grow min-w-0 pr-16">
+                          <div 
+                            onClick={() => handleToggleAddon(addon.id)}
+                            className="font-bold text-xs text-slate-800 leading-snug cursor-pointer select-none"
+                          >
+                            {addon.name}
+                          </div>
                           <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">{addon.description}</p>
                           <div className="inline-block px-1.5 py-0.5 bg-indigo-50 text-indigo-700 font-black text-[9px] font-mono rounded mt-1 border border-indigo-100">
                             +${addon.price} AUD
                           </div>
                         </div>
 
-                        {/* Corner checkbox selector node */}
-                        <div className={`w-5 h-5 rounded-full border absolute right-3 top-3.5 flex items-center justify-center transition-all ${
-                          isSelected ? "bg-indigo-600 border-indigo-650 text-white" : "border-slate-200 bg-slate-50"
-                        }`}>
-                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                        </div>
-                      </button>
+                        {isSelected ? (
+                          <div className="flex items-center gap-1 shrink-0 bg-white border border-indigo-200 rounded-lg p-0.5 shadow-xs absolute right-3 top-3.5">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateStandardAddonQuantity(addon.id, -1)}
+                              className="w-4.5 h-4.5 rounded flex items-center justify-center bg-slate-50 hover:bg-indigo-100 text-indigo-900 font-extrabold transition-colors cursor-pointer"
+                            >
+                              <Minus className="w-2.5 h-2.5 stroke-[3]" />
+                            </button>
+                            <span className="px-1 text-[10.5px] font-black text-indigo-950 font-mono w-4 text-center">
+                              {qty || 1}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateStandardAddonQuantity(addon.id, 1)}
+                              className="w-4.5 h-4.5 rounded flex items-center justify-center bg-slate-50 hover:bg-indigo-100 text-indigo-900 font-extrabold transition-colors cursor-pointer"
+                            >
+                              <Plus className="w-2.5 h-2.5 stroke-[3]" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleAddon(addon.id)}
+                            className="text-[10px] font-black shrink-0 px-2 py-0.5 rounded font-mono bg-slate-50 text-indigo-800 border border-indigo-100 hover:bg-slate-100 cursor-pointer transition-colors absolute right-3 top-4"
+                          >
+                            +${addon.price}
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -1234,7 +1400,7 @@ export default function PricingCalculator({
               </div>
 
               {/* Dynamic Suburb Metadata Citation Badge */}
-              <div className="bg-slate-950 text-slate-200 p-4 rounded-2xl border border-slate-800 space-y-2 select-none">
+              <div className="bg-slate-950 text-slate-200 p-4 rounded-2xl border border-slate-800 space-y-2 select-none font-sans">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
                     <MapPin className="w-4 h-4 text-emerald-500" />
@@ -1252,6 +1418,38 @@ export default function PricingCalculator({
                 <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
                   Reflects regional transit multipliers and WHS travel guidelines for this locality.
                 </p>
+
+                {suburbInfo.isActive && (
+                  <div className="mt-2 text-left pt-2 border-t border-slate-900 flex flex-col gap-1 text-[10px]">
+                    <div className="flex items-center gap-1.5 text-indigo-400 font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                      <span>State Rate Override Sync Active</span>
+                    </div>
+                    <p className="text-[9px] text-slate-400 leading-normal font-mono">
+                      Authority: <b className="text-slate-300">
+                        {suburbInfo.state === "NSW" ? "SafeWork NSW" :
+                         suburbInfo.state === "VIC" ? "WorkSafe Victoria" :
+                         suburbInfo.state === "QLD" ? "Workplace Health & Safety QLD" :
+                         suburbInfo.state === "SA" ? "SafeWork SA" :
+                         suburbInfo.state === "TAS" ? "WorkSafe Tasmania" :
+                         suburbInfo.state === "ACT" ? "WorkSafe ACT" :
+                         suburbInfo.state === "NT" ? "NT WorkSafe" :
+                         "WA WorkSafe Department of Mines & Safety"}
+                      </b>
+                      <br />
+                      Directive: <span className="text-amber-400">
+                        {suburbInfo.state === "NSW" ? "Work Health & Safety Act 2011 (NSW)" :
+                         suburbInfo.state === "VIC" ? "Occupational Health & Safety Act 2004 (VIC)" :
+                         suburbInfo.state === "QLD" ? "Work Health & Safety Act 2011 (QLD)" :
+                         suburbInfo.state === "SA" ? "Work Health & Safety Act 2012 (SA)" :
+                         suburbInfo.state === "TAS" ? "Work Health & Safety Act 2012 (TAS)" :
+                         suburbInfo.state === "ACT" ? "Work Health & Safety Act 2011 (ACT)" :
+                         suburbInfo.state === "NT" ? "Work Health & Safety Act 2011 (NT)" :
+                         "Work Health & Safety Act 2020 (WA)"}
+                      </span>
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Inactive or Service-Excluded Warnings */}
@@ -1286,7 +1484,7 @@ export default function PricingCalculator({
                             {activeMetadata?.model === "hourly" && `$${activeMetadata.basePrice}.00 × ${metadataHours} hrs`}
                             {activeMetadata?.model === "fixed" && `Fixed Flat Rate [${metadataPropertyType}]`}
                             {activeMetadata?.model === "per_room" && "Unit Room Summation"}
-                            {activeMetadata?.model === "per_item" && "Furniture Items Summation"}
+                            {activeMetadata?.model === "per_item" && (selectedMetadataId === "window-cleaning" ? "Glass Items Summation" : "Furniture Items Summation")}
                             {activeMetadata?.model === "sqm" && `Sqm Area Rate (${metadataSqm} sqm)`}
                             {activeMetadata?.model === "quote_based" && "Bespoke Builder Rate"}
                           </span>
@@ -1309,12 +1507,16 @@ export default function PricingCalculator({
                         )}
                         {activeMetadata?.model === "per_item" && (
                           <ul className="pl-3 border-l border-indigo-900/40 space-y-0.5 text-[10px] text-slate-500">
-                            {Object.entries(metadataItemCounters).map(([item, num]) => (num as number) > 0 && (
-                              <li key={item} className="flex justify-between">
-                                <span className="capitalize">{item.replace("Seat", " Seat")} × {num}</span>
-                                <span className="font-mono">${((activeMetadata.pricing as any)?.[item] || 0) * (num as number)}.00</span>
-                              </li>
-                            ))}
+                            {Object.entries(metadataItemCounters).map(([item, num]) => {
+                              if ((num as number) <= 0 || (activeMetadata.pricing as any)?.[item] === undefined) return null;
+                              const info = formatItemName(item);
+                              return (
+                                <li key={item} className="flex justify-between">
+                                  <span>{info.icon} {info.label} × {num}</span>
+                                  <span className="font-mono">${((activeMetadata.pricing as any)?.[item] || 0) * (num as number)}.00</span>
+                                </li>
+                              );
+                            })}
                           </ul>
                         )}
                         {metadataSubservice && (

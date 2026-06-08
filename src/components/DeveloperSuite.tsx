@@ -62,7 +62,7 @@ export default function DeveloperSuite({
   onAddCleaner,
   onAddQuoteManually,
 }: DeveloperSuiteProps) {
-  const [activeSuiteTab, setActiveSuiteTab] = useState<"hermes-agent" | "integration-console">("hermes-agent");
+  const [activeSuiteTab, setActiveSuiteTab] = useState<"hermes-agent" | "chatwoot" | "payload-cms" | "twenty-crm" | "integration-console">("hermes-agent");
   const [telegramInput, setTelegramInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
@@ -320,6 +320,7 @@ export default function DeveloperSuite({
         const mockQuote: QuoteRequest = {
           id: `lead_${Math.floor(Math.random() * 900000 + 100000)}`,
           postcode: ["6000", "2000", "3000", "4000"][Math.floor(Math.random() * 4)],
+          propertyType: ["Apartment", "Townhouse", "Standalone House"][Math.floor(Math.random() * 3)],
           serviceName: allServices[Math.floor(Math.random() * allServices.length)].name,
           name: ["Johnathan Vance", "Estelle Henderson", "Akihiko Satou", "Sarah Chesterfield"][Math.floor(Math.random() * 4)],
           email: "hermes.telegram@aastaclean.com.au",
@@ -490,28 +491,61 @@ export default function DeveloperSuite({
           </div>
 
           {/* Master View Switcher inside Developer suite */}
-          <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800 self-start md:self-end">
+          <div className="flex flex-wrap gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 self-start md:self-end">
             <button
               onClick={() => setActiveSuiteTab("hermes-agent")}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeSuiteTab === "hermes-agent"
                   ? "bg-purple-600 text-white shadow-lg"
                   : "text-slate-400 hover:text-white hover:bg-slate-900"
               }`}
             >
               <Workflow className="w-4 h-4 animate-pulse text-purple-400" />
-              <span>Hermes + Chatwoot Omni-Gateway</span>
+              <span>🤖 Hermes AI</span>
+            </button>
+            <button
+              onClick={() => setActiveSuiteTab("chatwoot")}
+              className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeSuiteTab === "chatwoot"
+                  ? "bg-emerald-600 text-white shadow-lg"
+                  : "text-slate-400 hover:text-white hover:bg-slate-900"
+              }`}
+            >
+              <MessageSquare className="w-4 h-4 text-emerald-400" />
+              <span>💬 Chatwoot Operator</span>
+            </button>
+            <button
+              onClick={() => setActiveSuiteTab("payload-cms")}
+              className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeSuiteTab === "payload-cms"
+                  ? "bg-blue-600 text-white shadow-lg"
+                  : "text-slate-400 hover:text-white hover:bg-slate-900"
+              }`}
+            >
+              <Database className="w-4 h-4 text-blue-450" />
+              <span>📦 Payload CMS</span>
+            </button>
+            <button
+              onClick={() => setActiveSuiteTab("twenty-crm")}
+              className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeSuiteTab === "twenty-crm"
+                  ? "bg-amber-600 text-white shadow-lg"
+                  : "text-slate-400 hover:text-white hover:bg-slate-900"
+              }`}
+            >
+              <Layers2 className="w-4 h-4 text-amber-450" />
+              <span>💼 Twenty CRM</span>
             </button>
             <button
               onClick={() => setActiveSuiteTab("integration-console")}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeSuiteTab === "integration-console"
                   ? "bg-indigo-600 text-white shadow-lg"
                   : "text-slate-400 hover:text-white hover:bg-slate-900"
               }`}
             >
               <Code2 className="w-4 h-4" />
-              <span>CRM & Webhook Connectors</span>
+              <span>🛰️ Webhooks & Queues</span>
             </button>
           </div>
         </div>
@@ -1080,7 +1114,7 @@ export default function DeveloperSuite({
             </motion.div>
           ) : (
             <motion.div
-              key="integration-tab"
+              key={activeSuiteTab}
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -15 }}
@@ -1091,6 +1125,15 @@ export default function DeveloperSuite({
                 onTriggerLog={onTriggerLog}
                 logs={logs}
                 onClearLogs={onClearLogs}
+                initialActiveTab={
+                  activeSuiteTab === "chatwoot"
+                    ? "chatwoot-inbox"
+                    : activeSuiteTab === "payload-cms"
+                    ? "payload-schema"
+                    : activeSuiteTab === "twenty-crm"
+                    ? "twenty-crm"
+                    : "webook-tester"
+                }
               />
             </motion.div>
           )}

@@ -29,3 +29,21 @@
   animation: float 4s ease-in-out infinite;
 }
 
+@keyframes low-stock-pulse {
+  0%, 100% {
+    border-color: rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 4px rgba(239, 68, 68, 0.1);
+    transform: scale(1);
+  }
+  50% {
+    border-color: rgba(239, 68, 68, 0.95);
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.45);
+    background-color: rgba(239, 68, 68, 0.08);
+    transform: scale(1.015);
+  }
+}
+
+.animate-low-stock-pulse {
+  animation: low-stock-pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+

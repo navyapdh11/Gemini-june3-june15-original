@@ -34,6 +34,23 @@ import {
   Check
 } from "lucide-react";
 import { QuoteRequest, ConnectionLog, Cleaner } from "../types";
+import { 
+  ResponsiveContainer, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  AreaChart, 
+  Area, 
+  LineChart, 
+  Line,
+  PieChart,
+  Pie,
+  Cell
+} from "recharts";
 
 interface CustomerDashboardProps {
   quotes: QuoteRequest[];
@@ -71,7 +88,7 @@ export default function CustomerDashboard({
   // State elements
   const [selectedDayOffset, setSelectedDayOffset] = useState<number>(2); // Horizontal date strip selection (e.g. June 5th)
   const [loyaltyCredits, setLoyaltyCredits] = useState<number>(45);
-  const [activeTab, setActiveTab] = useState<"summary" | "proof" | "billing" | "past">("summary");
+  const [activeTab, setActiveTab] = useState<"summary" | "proof" | "billing" | "past" | "analytics">("summary");
   
   // Rating states
   const [hasRated, setHasRated] = useState(false);
@@ -394,8 +411,55 @@ export default function CustomerDashboard({
           </div>
         </div>
 
-        {/* --- LAYER 2: POST-BOOKING BENTO & MAP TRACK (MAIN ROW) --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Dynamic Navigation Sub-Tabs Toggle */}
+        <div className="flex border-b border-slate-850 p-1 gap-2 self-start select-none">
+          <button
+            id="tab-btn-summary"
+            onClick={() => {
+              setActiveTab("summary");
+              onTriggerLog({
+                id: `tab_summary_${Date.now()}`,
+                type: "system",
+                status: "info",
+                message: "📅 Customer toggled active tab to 'My Bookings & Service Hub'",
+                timestamp: new Date().toLocaleTimeString(),
+              });
+            }}
+            className={`px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 border ${
+              activeTab === "summary"
+                ? "bg-indigo-600/10 border-indigo-500/30 text-indigo-400 font-extrabold shadow-sm"
+                : "bg-transparent border-transparent text-slate-400 hover:text-white"
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            <span>My Bookings & Service Hub</span>
+          </button>
+          <button
+            id="tab-btn-analytics"
+            onClick={() => {
+              setActiveTab("analytics");
+              onTriggerLog({
+                id: `tab_analytics_${Date.now()}`,
+                type: "system",
+                status: "info",
+                message: "📊 Customer toggled active tab to 'Market Analytics'",
+                timestamp: new Date().toLocaleTimeString(),
+              });
+            }}
+            className={`px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 border ${
+              activeTab === "analytics"
+                ? "bg-purple-600/10 border-purple-500/30 text-purple-400 font-extrabold shadow-sm"
+                : "bg-transparent border-transparent text-slate-400 hover:text-white"
+            }`}
+          >
+            <TrendingUp className="w-4 h-4 text-purple-400" />
+            <span>Market Analytics</span>
+          </button>
+        </div>
+
+        {activeTab === "summary" ? (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
           {/* LEFT 7 COLUMNS: ACTIVE JOB TRACKING, MAP, & PROOF */}
           <div className="lg:col-span-8 space-y-8">
@@ -464,6 +528,7 @@ export default function CustomerDashboard({
                     </h2>
                     <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-1">
                       <MapPin className="w-3.5 h-3.5 text-zinc-500" /> Postcode {activeBooking.postcode} &bull; Perth West Precinct
+                      {activeBooking.propertyType && <span className="text-indigo-400 font-bold ml-1">🏡 {activeBooking.propertyType}</span>}
                     </p>
                   </div>
 
@@ -1020,6 +1085,213 @@ export default function CustomerDashboard({
             </button>
           </div>
         </div>
+        </>
+        ) : (
+          /* MARKET ANALYTICS TAB CONTENT */
+          <div id="market-analytics-view" className="space-y-8 animate-fade-in">
+            {/* Header / Intro Banner */}
+            <div className="bg-slate-900 border border-purple-500/10 rounded-3xl p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl pointer-events-none" />
+              <p className="text-[10px] font-mono font-bold text-purple-400 uppercase tracking-widest flex items-center gap-1.5 animate-pulse">
+                <TrendingUp className="w-3.5 h-3.5" /> Regional Market Expansion Analytics
+              </p>
+              <h3 className="text-xl font-bold text-white mt-1">Western Australia Cleaning Industry Benchmarks</h3>
+              <p className="text-xs text-slate-400 mt-1 max-w-4xl font-sans font-normal">
+                Analyse cleaning agency densities, regional bio-cleansing standards, and rate performance trajectories across WA municipal postcodes.
+              </p>
+            </div>
+
+            {/* Recharts Section 1 */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              
+              {/* Left Column: Price Trajectories */}
+              <div className="lg:col-span-8 bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 space-y-4">
+                <div>
+                  <h4 className="font-extrabold text-white text-sm flex items-center gap-2">
+                    📈 Hourly Rate Trajectory ($ AUD / hour)
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Comparison of average specialty bio-cleansing rates vs standard domestic cleaning rates in WA over the last 4 quarters.
+                  </p>
+                </div>
+
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={[
+                        { quarter: "Q4 2025", Standard: 45, BioSpeciality: 68 },
+                        { quarter: "Q1 2026", Standard: 48, BioSpeciality: 72 },
+                        { quarter: "Q2 2026", Standard: 50, BioSpeciality: 78 },
+                        { quarter: "Q3 2026", Standard: 52, BioSpeciality: 84 },
+                      ]}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="colorStd" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.2}/>
+                          <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorBio" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#a855f7" stopOpacity={0.2}/>
+                          <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                      <XAxis dataKey="quarter" stroke="#94a3b8" fontSize={10} tickLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} unit="$" />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#020617", border: "1px solid #334155", borderRadius: "12px", color: "#f8fafc" }}
+                        itemStyle={{ fontSize: "11px" }}
+                        labelStyle={{ fontSize: "11px", fontWeight: "bold" }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "10px" }} />
+                      <Area type="monotone" dataKey="Standard" stroke="#4f46e5" fillOpacity={1} fill="url(#colorStd)" name="Standard Domestic Mean" />
+                      <Area type="monotone" dataKey="BioSpeciality" stroke="#a855f7" fillOpacity={1} fill="url(#colorBio)" name="Accredited Bio-Cleansing" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Right Column: Market Share */}
+              <div className="lg:col-span-4 bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 space-y-4 flex flex-col justify-between">
+                <div>
+                  <h4 className="font-extrabold text-white text-sm flex items-center gap-1.5">
+                    🍕 Service Class Distribution
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Breakdown of niche cleaning requirements captured in active regional systems.
+                  </p>
+                </div>
+
+                <div className="h-44 w-full flex items-center justify-center relative">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: "Silica Industrial", value: 45 },
+                          { name: "Standard Office", value: 30 },
+                          { name: "End of Lease", value: 15 },
+                          { name: "Other Bio-safe", value: 10 }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={70}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        <Cell fill="#a855f7" />
+                        <Cell fill="#6366f1" />
+                        <Cell fill="#06b6d4" />
+                        <Cell fill="#3b82f6" />
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#020617", border: "1px solid #334155", borderRadius: "12px", color: "#f8fafc" }}
+                        itemStyle={{ fontSize: "11px" }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-lg font-black text-white">45%</span>
+                    <span className="text-[9px] text-slate-500 font-mono tracking-wider uppercase">Silica Lead</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-[10px] font-mono border-t border-slate-800/60 pt-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded bg-purple-500 inline-block shrink-0" />
+                    <span className="text-slate-400 text-[10px]">Silica Task</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded bg-indigo-500 inline-block shrink-0" />
+                    <span className="text-slate-400 text-[10px]">Standard Office</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Benchmarking Comparison Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              
+              {/* Competition Density Chart */}
+              <div className="bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 space-y-4">
+                <div>
+                  <h4 className="font-extrabold text-white text-sm flex items-center gap-2">
+                    📊 Regional Competitor Surcharge Comparison
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5 font-sans">
+                    Average agency travel surcharges vs AastaClean standard flat rate ($25.00) in selected parts of WA.
+                  </p>
+                </div>
+
+                <div className="h-56 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={[
+                        { name: "Subiaco (6008)", Competitors: 35, AastaClean: 25 },
+                        { name: "Mandurah (6210)", Competitors: 48, AastaClean: 25 },
+                        { name: "Perth (6000)", Competitors: 30, AastaClean: 25 },
+                        { name: "Joondalup (6027)", Competitors: 42, AastaClean: 25 },
+                      ]}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={9} tickLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} unit="$" />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#020617", border: "1px solid #334155", borderRadius: "12px", color: "#f8fafc" }}
+                        itemStyle={{ fontSize: "11px" }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "10px" }} />
+                      <Bar dataKey="Competitors" fill="#f43f5e" radius={[4, 4, 0, 0]} name="Avg Competitor Fee" />
+                      <Bar dataKey="AastaClean" fill="#10b981" radius={[4, 4, 0, 0]} name="AastaClean Flat Fee" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Security & Bio-Standards Checklist Card */}
+              <div className="bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 space-y-4 flex flex-col justify-between">
+                <div>
+                  <h4 className="font-extrabold text-white text-sm flex items-center gap-1.5">
+                    ⚙️ Accredited Bio-Cleansing Integrity Scorecard
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Key compliance standards enforced at AastaClean versus typical WA domestic providers.
+                  </p>
+                </div>
+
+                <div className="space-y-3 my-auto py-2">
+                  <div className="flex items-center justify-between p-2.5 bg-slate-950/80 rounded-xl border border-slate-850">
+                    <span className="text-xs text-slate-300 font-sans font-medium flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> Silica-Inhalation Dust Standards
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-emerald-400">100% Enforced</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-950/80 rounded-xl border border-slate-850">
+                    <span className="text-xs text-slate-300 font-sans font-medium flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> HEPA H14 Medical Grade Filtration
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-emerald-400">100% Guaranteed</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-950/80 rounded-xl border border-slate-850">
+                    <span className="text-xs text-slate-300 font-sans font-medium flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-indigo-400 inline-block" /> Real-time Crew GPS Tracking
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-indigo-400">Active</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-indigo-950/20 rounded-xl border border-indigo-900/30 text-[10px] text-indigo-300 leading-normal font-sans font-normal">
+                  💡 **Analytical Insight**: Utilizing AastaClean's accredited equipment mitigates silica workplace exposure hazards while remaining on-trend with Western Australia's strict regulatory guidelines.
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        )}
 
       </div>
     </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Search, Shield, HelpCircle, Phone, HelpCircle as Mail, Check, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { demoPostcodes } from "../data";
+import { safeLocalStorage as localStorage } from "../utils/storageFallback";
 
 interface HeroProps {
   onPostcodeSubmit: (postcode: string) => void;

@@ -18,10 +18,12 @@ import ServiceExplorer from "./components/ServiceExplorer";
 import PricingCalculator from "./components/PricingCalculator";
 import CustomerDashboard from "./components/CustomerDashboard";
 import HermesChatwootWidget from "./components/HermesChatwootWidget";
+import ProgrammaticLandingPage from "./components/ProgrammaticLandingPage";
 
 import { QuoteRequest, ConnectionLog, WebhookConfig, Cleaner, ServiceItem, StateCoverage, PostcodeCoverage } from "./types";
 import { defaultWebhookConfig, allServices } from "./data";
 import { Copy, Terminal, Database, Check, AlertCircle, Sparkles, Code, Link2 } from "lucide-react";
+import { safeLocalStorage as localStorage } from "./utils/storageFallback";
 
 const DEFAULT_CLEANERS: Cleaner[] = [
   { id: "cleaner_1", name: "Liam Vance", phone: "0412 111 222", email: "liam.vance@aastaclean.com.au", status: "active", rating: 4.9 },
@@ -34,6 +36,7 @@ const INITIAL_QUOTES: QuoteRequest[] = [
   {
     id: "booking_101",
     postcode: "6008",
+    propertyType: "Standalone House",
     serviceName: "Commercial Cleaning",
     name: "Sarah Reynolds",
     email: "sarah.reynolds@enterprise.com.au",
@@ -48,6 +51,7 @@ const INITIAL_QUOTES: QuoteRequest[] = [
   {
     id: "booking_102",
     postcode: "2000",
+    propertyType: "Apartment",
     serviceName: "Carpet Cleaning",
     name: "Mark Chesterfield",
     email: "mark.c@sydneycorp.com.au",
@@ -61,6 +65,7 @@ const INITIAL_QUOTES: QuoteRequest[] = [
   {
     id: "booking_103",
     postcode: "3000",
+    propertyType: "Townhouse",
     serviceName: "NDIS Cleaning",
     name: "Chloe Henderson",
     email: "chloe.henderson@ndis-care.com.au",
@@ -105,16 +110,36 @@ export default function App() {
   });
 
   const [dynPostcodes, setDynPostcodes] = useState<PostcodeCoverage[]>(() => {
-    const saved = localStorage.getItem("aastaclean_postcodes");
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
-    }
-    return [
+    const defaultPostcodes: PostcodeCoverage[] = [
       { code: "2000", suburb: "Sydney CBD", state: "NSW", isActive: true, multiplier: 1.30, disabledServices: [] },
       { code: "3000", suburb: "Melbourne Central", state: "VIC", isActive: true, multiplier: 1.15, disabledServices: [] },
       { code: "4000", suburb: "Brisbane City", state: "QLD", isActive: true, multiplier: 1.10, disabledServices: [] },
-      { code: "6007", suburb: "Perth West Precinct", state: "WA", isActive: true, multiplier: 1.20, disabledServices: [] }
+      { code: "6000", suburb: "Perth CBD", state: "WA", isActive: true, multiplier: 1.25, disabledServices: [] },
+      { code: "6004", suburb: "East Perth", state: "WA", isActive: true, multiplier: 1.20, disabledServices: [] },
+      { code: "6005", suburb: "West Perth", state: "WA", isActive: true, multiplier: 1.15, disabledServices: [] },
+      { code: "6007", suburb: "West Leederville", state: "WA", isActive: true, multiplier: 1.20, disabledServices: [] },
+      { code: "6008", suburb: "Subiaco", state: "WA", isActive: true, multiplier: 1.20, disabledServices: [] },
+      { code: "6009", suburb: "Nedlands", state: "WA", isActive: true, multiplier: 1.15, disabledServices: [] },
+      { code: "6010", suburb: "Claremont", state: "WA", isActive: true, multiplier: 1.22, disabledServices: [] },
+      { code: "6019", suburb: "Scarborough", state: "WA", isActive: true, multiplier: 1.18, disabledServices: [] },
+      { code: "6027", suburb: "Joondalup", state: "WA", isActive: true, multiplier: 1.10, disabledServices: [] },
+      { code: "6160", suburb: "Fremantle", state: "WA", isActive: true, multiplier: 1.22, disabledServices: [] },
+      { code: "6210", suburb: "Mandurah", state: "WA", isActive: true, multiplier: 1.05, disabledServices: [] }
     ];
+    const saved = localStorage.getItem("aastaclean_postcodes");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as PostcodeCoverage[];
+        const merged = [...parsed];
+        defaultPostcodes.forEach(defPC => {
+          if (!merged.some(p => p.code === defPC.code)) {
+            merged.push(defPC);
+          }
+        });
+        return merged;
+      } catch (e) {}
+    }
+    return defaultPostcodes;
   });
 
   // Guardrail states
@@ -550,9 +575,15 @@ export default function App() {
           onChangeView={handleViewChange}
         />
       ) : (
-        <SeoEEATCommand
-          onTriggerLog={addLog}
-        />
+        <>
+          <ProgrammaticLandingPage
+            onOpenQuote={handleOpenQuote}
+            onTriggerLog={addLog}
+          />
+          <SeoEEATCommand
+            onTriggerLog={addLog}
+          />
+        </>
       )}
 
       {/* Always render Business Footprints Layout */}

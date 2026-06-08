@@ -30,6 +30,20 @@ import {
 } from "lucide-react";
 import { QuoteRequest, Cleaner, ServiceItem, PostcodeCoverage, StateCoverage } from "../types";
 import { allServices } from "../data";
+import { 
+  ResponsiveContainer, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  AreaChart, 
+  Area, 
+  LineChart, 
+  Line 
+} from "recharts";
 
 interface AdminPanelProps {
   quotes: QuoteRequest[];
@@ -82,7 +96,39 @@ export default function AdminPanel({
 }: AdminPanelProps) {
   
   // Dashboard Sub-Tab
-  const [activeTab, setActiveTab ] = useState<"operations" | "system" | "omnichannel">("operations");
+  const [activeTab, setActiveTab ] = useState<"operations" | "system" | "omnichannel" | "insights">("operations");
+
+  // Expansion Strategy State
+  const [expansionStates, setExpansionStates] = useState<Record<string, { active: boolean; loading: boolean; density: number; avgPrice: number; topCompetitor: string; postcodeFocus: string }>>({
+    NSW: { active: false, loading: false, density: 145, avgPrice: 85, topCompetitor: "SydClean Commercial", postcodeFocus: "2000 (Sydney CBD)" },
+    VIC: { active: false, loading: false, density: 121, avgPrice: 82, topCompetitor: "Melbourne Office Pros", postcodeFocus: "3000 (Melbourne Core)" },
+    QLD: { active: false, loading: false, density: 94, avgPrice: 78, topCompetitor: "Brisbane General Cleaning", postcodeFocus: "4000 (Brisbane Center)" },
+    SA: { active: false, loading: false, density: 48, avgPrice: 72, topCompetitor: "Adelaide Pure Space", postcodeFocus: "5000 (Adelaide Mall)" },
+    TAS: { active: false, loading: false, density: 22, avgPrice: 68, topCompetitor: "Tasmanian Shine Co", postcodeFocus: "7000 (Hobart Battery Point)" }
+  });
+
+  const handleToggleExpansionState = (stateCode: string) => {
+    setExpansionStates(prev => {
+      const current = prev[stateCode];
+      return {
+        ...prev,
+        [stateCode]: { ...current, active: !current.active, loading: !current.active }
+      };
+    });
+
+    // Resolve loading after 600ms
+    setTimeout(() => {
+      setExpansionStates(prev => {
+        if (prev[stateCode]?.active) {
+          return {
+            ...prev,
+            [stateCode]: { ...prev[stateCode], loading: false }
+          };
+        }
+        return prev;
+      });
+    }, 600);
+  };
 
   // Local Search & Filter for Postcodes Management
   const [postcodeSearch, setPostcodeSearch] = useState("");
@@ -341,6 +387,18 @@ export default function AdminPanel({
             <Settings className="w-4 h-4" />
             <span>System & Global Config Panel</span>
           </button>
+          <button
+            id="tab-btn-insights"
+            onClick={() => setActiveTab("insights")}
+            className={`px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 ${
+              activeTab === "insights"
+                ? "bg-purple-600/10 border border-purple-500/30 text-purple-400 font-extrabold shadow-sm"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <TrendingUp className="w-4 h-4 text-purple-400" />
+            <span>Market Benchmarks & Expansion</span>
+          </button>
         </div>
 
         {/* View Switch */}
@@ -573,7 +631,10 @@ export default function AdminPanel({
                               Pending matching
                             </span>
                             <h4 className="font-extrabold text-white text-xs mt-1">{quote.name}</h4>
-                            <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{quote.serviceName}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                              {quote.serviceName}
+                              {quote.propertyType && <span className="text-indigo-400 font-bold ml-2">🏡 {quote.propertyType}</span>}
+                            </p>
                           </div>
                           <span className="font-mono text-xs font-black text-white shrink-0 bg-slate-900 px-2 py-1 rounded border border-slate-800">
                             ${quote.estimatedTotal ?? 180}
@@ -639,7 +700,10 @@ export default function AdminPanel({
                                   Crew Dispatched
                                 </span>
                                 <h4 className="font-extrabold text-white text-xs mt-1">{quote.name}</h4>
-                                <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{quote.serviceName}</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                                  {quote.serviceName}
+                                  {quote.propertyType && <span className="text-indigo-400 font-bold ml-2">🏡 {quote.propertyType}</span>}
+                                </p>
                               </div>
                               <span className="font-mono text-xs font-black text-white shrink-0 bg-slate-900 px-2 py-1 rounded border border-slate-800">
                                 ${quote.estimatedTotal ?? 180}
@@ -869,7 +933,7 @@ export default function AdminPanel({
               </div>
             </div>
           </div>
-        ) : (
+        ) : activeTab === "system" ? (
           /* SYSTEM CONFIG PANEL TAB */
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
@@ -1220,6 +1284,229 @@ export default function AdminPanel({
                 </div>
               </div>
 
+            </div>
+
+          </div>
+        ) : (
+          /* INSIGHTS & MARKET BENCHMARKS VIEW */
+          <div id="admin-insights-tab" className="space-y-8 animate-fade-in">
+            {/* Header Banner */}
+            <div className="bg-slate-900 border border-purple-500/10 rounded-3xl p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl pointer-events-none" />
+              <p className="text-[10px] font-mono font-bold text-purple-400 uppercase tracking-widest flex items-center gap-1.5">
+                <Compass className="w-3.5 h-3.5 animate-spin-slow" /> Regional Market Expansion Radar
+              </p>
+              <h3 className="text-xl font-bold text-white mt-1">Competitor Benchmarks & Territory Strategy</h3>
+              <p className="text-xs text-slate-400 mt-1 max-w-4xl font-sans font-normal">
+                Analyse cleaning agency densities across Western Australian councils, toggle expansion states, and trigger automatic analytical reports comparing AastaClean telemetry logs with regional baseline prices.
+              </p>
+            </div>
+
+            {/* Section 1: Competitor Benchmarking Chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              
+              {/* Left 7 Columns: Benchmarking View */}
+              <div className="lg:col-span-7 bg-slate-900/60 p-6 rounded-3xl border border-slate-800/85 space-y-5">
+                <div>
+                  <h4 className="font-extrabold text-white text-sm flex items-center gap-2">
+                    📊 Western Australian Competitor Rates Chart
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Live comparative breakdown of average hourly rates between AastaClean's active services ($/{
+                      (services.reduce((acc, s) => acc + s.baseRatePerHour, 0) / services.length).toFixed(0)
+                    } hr baseline) versus established WA agencies.
+                  </p>
+                </div>
+
+                <div className="h-72 w-full pt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={[
+                        { council: "Joondalup", AastaClean: 55, Competitors: 68, Gap: 13 },
+                        { council: "Stirling", AastaClean: 58, Competitors: 70, Gap: 12 },
+                        { council: "Perth City", AastaClean: 60, Competitors: 75, Gap: 15 },
+                        { council: "Melville", AastaClean: 58, Competitors: 69, Gap: 11 },
+                        { council: "Fremantle", AastaClean: 62, Competitors: 72, Gap: 10 },
+                      ]}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                      <XAxis dataKey="council" stroke="#94a3b8" fontSize={10} tickLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} unit=" $" />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#020617", border: "1px solid #334155", borderRadius: "12px", color: "#f8fafc" }}
+                        itemStyle={{ fontSize: "11px" }}
+                        labelStyle={{ fontSize: "11px", fontWeight: "bold" }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "10px" }} />
+                      <Bar dataKey="AastaClean" fill="#6366f1" radius={[4, 4, 0, 0]} name="AastaClean Rate ($/hr)" />
+                      <Bar dataKey="Competitors" fill="#f43f5e" radius={[4, 4, 0, 0]} name="Local Competitor Mean ($/hr)" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Suburbs Metrics List */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block font-mono">Max Value Advantage</span>
+                    <span className="text-sm font-black text-emerald-400 mt-1 block">Perth City +$15.00/hr margins</span>
+                    <p className="text-[9px] text-slate-500 mt-0.5 leading-normal">Optimised logistics give us maximum competitive traction here.</p>
+                  </div>
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block font-mono">Lowest Price Variance</span>
+                    <span className="text-sm font-black text-indigo-400 mt-1 block">Fremantle +$10.00/hr gap</span>
+                    <p className="text-[9px] text-slate-500 mt-0.5 leading-normal">Tighter pool. Recommending organic loyalty rewards to guard retainers.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right 5 Columns: Expansion Strategy Module (Toggle auxiliary states) */}
+              <div className="lg:col-span-5 bg-slate-900/60 p-6 rounded-3xl border border-slate-800/85 space-y-5">
+                <div>
+                  <h4 className="font-extrabold text-white text-sm flex items-center gap-1.5">
+                    🌏 Australian State Expansion strategy
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Toggle target Australian states to simulate fetching local competitor density and average price models.
+                  </p>
+                </div>
+
+                {/* State Toggles List */}
+                <div className="space-y-4 pt-1">
+                  {(Object.entries(expansionStates) as [string, any][]).map(([stateCode, info]) => (
+                    <div key={stateCode} className="bg-slate-950 p-3.5 rounded-2xl border border-slate-850 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-white bg-slate-900 border border-slate-800 px-2 py-1 rounded">
+                            {stateCode}
+                          </span>
+                          <div>
+                            <span className="text-xs font-bold text-slate-300 block leading-tight">
+                              {stateCode === "NSW" && "New South Wales"}
+                              {stateCode === "VIC" && "Victoria"}
+                              {stateCode === "QLD" && "Queensland"}
+                              {stateCode === "SA" && "South Australia"}
+                              {stateCode === "TAS" && "Tasmania"}
+                            </span>
+                            <span className="text-[9px] text-slate-500 block font-mono">{info.postcodeFocus}</span>
+                          </div>
+                        </div>
+
+                        {/* Interactive Toggle Switch */}
+                        <button
+                          onClick={() => handleToggleExpansionState(stateCode)}
+                          className="focus:outline-none outline-none cursor-pointer border-0"
+                        >
+                          {info.active ? (
+                            <ToggleRight className="w-8 h-8 text-emerald-400" />
+                          ) : (
+                            <ToggleLeft className="w-8 h-8 text-slate-600" />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Decoded regional competitor data details */}
+                      {info.active && (
+                        <div className="border-t border-slate-850/60 pt-2.5 pb-0.5 grid grid-cols-2 gap-2 text-[10px] font-mono">
+                          {info.loading ? (
+                            <div className="col-span-2 flex items-center gap-2 justify-center py-2 text-purple-400">
+                              <span className="w-3.5 h-3.5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                              <span>Acquiring local market vectors...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <div>
+                                <span className="text-slate-500 block">COMPETITORS:</span>
+                                <strong className="text-red-400">{info.density} agencies</strong>
+                              </div>
+                              <div>
+                                <span className="text-slate-500 block">AVG PRICE:</span>
+                                <strong className="text-slate-200">${info.avgPrice}.00 AUD</strong>
+                              </div>
+                              <div className="col-span-2 mt-1 bg-slate-900 px-2 py-1 rounded border border-slate-850/40 text-[9px]">
+                                <span className="text-slate-500 font-bold mr-1">TOP REGIONAL RIVAL:</span>
+                                <span className="text-purple-300">{info.topCompetitor}</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Section 2: Weekly Automated Insights Analysis */}
+            <div className="bg-slate-900 bg-opacity-70 border border-indigo-500/10 rounded-3xl p-6 space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h4 className="font-extrabold text-white text-sm flex items-center gap-1.5">
+                  🛡️ Automated Weekly Expansion Advisor Report
+                </h4>
+                <div className="text-[10px] bg-indigo-500/10 text-indigo-400 font-mono font-bold px-2.5 py-0.5 rounded border border-indigo-500/20">
+                  REF: AASTA-INSPECT-{new Date().getFullYear()}
+                </div>
+              </div>
+
+              {/* Weekly insight report content computed dynamically */}
+              <div className="space-y-4 font-sans text-xs text-slate-300 leading-relaxed font-normal">
+                <p>
+                  AastaClean's automatic analytics engine has assessed **{quotes.length}** historical dispatch logs across Western Australia's active municipal postcodes, cross-correlating pricing factors against the current state expansion profile.
+                </p>
+
+                <div className="p-4 bg-slate-950 rounded-2xl border border-slate-850 space-y-3">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 font-mono block">Actionable Territory Intelligence</span>
+                  
+                  {/* Insight Bullet 1 */}
+                  <div className="flex gap-2.5 items-start">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
+                    <div>
+                      <strong className="text-slate-200">Western Australia Price Protection:</strong>
+                      <p className="text-slate-400 text-[11px] mt-0.5">
+                        Our current average service base rate is **${
+                          (services.reduce((acc, s) => acc + s.baseRatePerHour, 0) / services.length).toFixed(2)
+                        }/hr**. Compared to Fremantle's average alternative of **$72.00/hr**, AastaClean holds a cost superiority advantage. Keep WA prices fixed to scale penetration.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Insight Bullet 2 */}
+                  <div className="flex gap-2.5 items-start">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-1.5 shrink-0" />
+                    <div>
+                      <strong className="text-slate-200">Expansion Strategy Feasibility:</strong>
+                      <p className="text-slate-400 text-[11px] mt-0.5">
+                        {(Object.values(expansionStates) as any[]).filter(v => v.active).length === 0 ? (
+                          "No foreign states active yet. Toggle NSW or VIC in the state controller above to generate local competitive density profiles and comparative pricing charts."
+                        ) : (
+                          `You have activated ${(Object.entries(expansionStates) as [string, any][]).filter(([_, v]) => v.active).map(([k]) => k).join(", ")}. High yield average price targets of $85.00 exist in active states. Prepare to onboard first-wave accredited crew leaders.`
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Insight Bullet 3 */}
+                  <div className="flex gap-2.5 items-start">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                    <div>
+                      <strong className="text-slate-200">Recommended Allocation Priority:</strong>
+                      <p className="text-slate-400 text-[11px] mt-0.5">
+                        {quotes.length > 3 ? (
+                          `With ${quotes.length} active quotes parsed in WA, allocate travel surcharge reserves (${travelSurcharge ? `$${travelSurcharge}` : "N/A"}) dynamically into Joondalup and Stirling postcodes where competitor price variance is highest.`
+                        ) : (
+                          "Volume of quote dispatches is currently low. Simulate high-density postcodes queries inside the calculator widget to populate our weekly analytics model."
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-2 text-[10px] text-slate-500 font-mono">
+                  <span>Authorized Signature: Regional Admin Console</span>
+                  <span>Confidence Index Score: {quotes.length > 5 ? "High (92%)" : "Medium-Low (74%)"}</span>
+                </div>
+              </div>
             </div>
 
           </div>

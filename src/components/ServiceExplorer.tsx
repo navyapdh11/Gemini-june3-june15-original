@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { ServiceItem } from "../types";
 import { allServices } from "../data";
+import { addonRegistry } from "../servicesCatalog";
 
 interface ServiceExplorerProps {
   onOpenQuote: (service?: string) => void;
@@ -69,12 +70,14 @@ export default function ServiceExplorer({ onOpenQuote, services = allServices }:
   };
 
   // Addon services list
-  const addons = [
-    { name: "Eco-Active Microbial Guard", price: "$49", desc: "Long-lasting surface barrier fighting pathogens for 30 days." },
-    { name: "Premium Deodorisation Upgrade", price: "$29", desc: "Thermal fogging targeting deep-tissue carpet and fabric fibers." },
-    { name: "Hydrophobic Dust Shield Coating", price: "$39", desc: "Prevents immediate dust settlement on glass and sills." },
-    { name: "Waste Management Surcharge", price: "$69", desc: "Authorized medical & heavy trade containment trash disposal." },
-  ];
+  const dynamicAddons = addonRegistry
+    .filter((a) => a.categories.includes(activeService.category as any))
+    .slice(0, 4)
+    .map((add) => ({
+      name: add.icon + " " + add.name,
+      price: `$${add.price} AUD`,
+      desc: add.description
+    }));
 
   // Filtering list
   const filteredServices = services.filter(service => {
@@ -319,7 +322,7 @@ export default function ServiceExplorer({ onOpenQuote, services = allServices }:
                 <Layers className="w-4 h-4 text-indigo-600" /> Recommended Addons & Upgrades
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {addons.map((add, idx) => (
+                {dynamicAddons.map((add, idx) => (
                   <div key={idx} className="bg-slate-50 border border-slate-150 p-3 rounded-xl flex items-start justify-between gap-2.5 hover:bg-slate-120 transition-all select-none">
                     <div>
                       <div className="font-extrabold text-[11px] text-slate-900 group-hover:text-indigo-900">

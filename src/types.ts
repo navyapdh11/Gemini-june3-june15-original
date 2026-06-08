@@ -13,6 +13,7 @@ export interface SelectedAddon {
   name: string;
   price: number;
   icon?: string;
+  quantity?: number;
 }
 
 export interface QuoteRequest {
@@ -43,6 +44,19 @@ export interface QuoteRequest {
   deskCount?: number;
   communalCount?: number;
   frequencyOption?: string;
+  propertyType?: string;
+  // Phase 1 Advanced Booking Fields
+  roomBreakdown?: Record<string, number>;
+  slaTier?: string;
+  schedulingDetails?: {
+    preferredDate?: string;
+    timeSlot?: string; // e.g., Morning, Out-of-Hours/Nocturnal, Weekend Surge
+    keyExchange?: string; // e.g., Lockbox PIN, Secure Keyholding, Front-desk Sign-in, Security Escort
+  };
+  assignedCrewId?: string;
+  businessName?: string;
+  industry?: string;
+  isFlagged?: boolean;
 }
 
 export interface Cleaner {
