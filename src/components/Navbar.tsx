@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Phone, Send, Code, ShieldCheck, HelpCircle, Sparkles, Sun, Moon } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 
@@ -21,11 +21,16 @@ export default function Navbar({
   const { daylightHighContrast, setDaylightHighContrast } = useTheme();
 
   // Monitor scrolling to add backdrop blur
-  if (typeof window !== "undefined") {
-    window.addEventListener("scroll", () => {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleScroll = () => {
       setScrolled(window.scrollY > 20);
-    });
-  }
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   return (
     <nav
@@ -135,7 +140,7 @@ export default function Navbar({
             <button
               onClick={onToggleDevMode}
               id="dev-panel-toggle"
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border cursor-pointer ${
                 isDevMode
                   ? "bg-indigo-50 border-indigo-200 text-indigo-700 shadow-inner"
                   : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700"

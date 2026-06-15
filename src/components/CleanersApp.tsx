@@ -202,6 +202,401 @@ const SwipeActionTrack = ({
   );
 };
 
+interface TechnicianMapContainerProps {
+  job: QuoteRequest;
+  pcodeDetails: { lat: number; lng: number; label: string };
+  cleanerGpsCoords: Record<string, { lat: number; lng: number; bearing: number }>;
+  daylightHighContrast: boolean;
+  hasValidMapKey: boolean;
+  GOOGLE_MAPS_KEY: string;
+  mapMode: "roadmap" | "satellite";
+  setMapMode: (mode: "roadmap" | "satellite") => void;
+  onTriggerLog: (log: any) => void;
+  gpsTelemetryHistory: Record<string, any[]>;
+}
+
+function TechnicianMapContainer({
+  job,
+  pcodeDetails,
+  cleanerGpsCoords,
+  daylightHighContrast,
+  hasValidMapKey,
+  GOOGLE_MAPS_KEY,
+  mapMode,
+  setMapMode,
+  onTriggerLog,
+  gpsTelemetryHistory
+}: TechnicianMapContainerProps) {
+  const [zoom, setZoom] = useState(13);
+  const [center, setCenter] = useState({ lat: pcodeDetails.lat, lng: pcodeDetails.lng });
+
+  const currentCoord = cleanerGpsCoords[job.id];
+  const lastCoordRef = useRef<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    if (currentCoord) {
+      const changed = !lastCoordRef.current || 
+                     lastCoordRef.current.lat !== currentCoord.lat || 
+                     lastCoordRef.current.lng !== currentCoord.lng;
+      if (changed) {
+        setCenter({ lat: currentCoord.lat, lng: currentCoord.lng });
+        setZoom(16); // auto zoom in on active tracker points
+        lastCoordRef.current = { lat: currentCoord.lat, lng: currentCoord.lng };
+      }
+    }
+  }, [currentCoord]);
+
+  // Handle card switching or suburb change
+  useEffect(() => {
+    setCenter({ lat: pcodeDetails.lat, lng: pcodeDetails.lng });
+    setZoom(13);
+    lastCoordRef.current = null;
+  }, [pcodeDetails.lat, pcodeDetails.lng]);
+
+  const handleCameraChange = (ev: any) => {
+    if (ev.detail && ev.detail.zoom !== undefined) {
+      setZoom(ev.detail.zoom);
+    }
+    if (ev.detail && ev.detail.center !== undefined) {
+      setCenter(ev.detail.center);
+    }
+  };
+
+  const handleZoomIn = () => setZoom(prev => Math.min(19, prev + 1));
+  const handleZoomOut = () => setZoom(prev => Math.max(10, prev - 1));
+  const handleCenterJob = () => {
+    setCenter({ lat: pcodeDetails.lat, lng: pcodeDetails.lng });
+    setZoom(13);
+  };
+  const handleCenterTech = () => {
+    if (currentCoord) {
+      setCenter({ lat: currentCoord.lat, lng: currentCoord.lng });
+      setZoom(16);
+    }
+  };
+
+  const handleGlobalMapKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Enable arrows for panning center when container or inner elements are active
+    const step = 0.004 / Math.pow(2, zoom - 13);
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setCenter(prev => ({ lat: prev.lat + step, lng: prev.lng }));
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setCenter(prev => ({ lat: prev.lat - step, lng: prev.lng }));
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      setCenter(prev => ({ lat: prev.lat, lng: prev.lng - step }));
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      setCenter(prev => ({ lat: prev.lat, lng: prev.lng + step }));
+    } else if (e.key === "+" || e.key === "=") {
+      e.preventDefault();
+      handleZoomIn();
+    } else if (e.key === "-") {
+      e.preventDefault();
+      handleZoomOut();
+    }
+  };
+
+  return (
+    <div 
+      tabIndex={0}
+      role="region"
+      aria-label="Interactive technician tracking map. Use Arrow Keys to pan center. Use Plus/Minus to zoom."
+      onKeyDown={handleGlobalMapKeyDown}
+      className={`w-full h-44 rounded-2xl overflow-hidden relative flex flex-col items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${
+        daylightHighContrast 
+          ? "border-2 border-black bg-white focus-visible:ring-offset-white" 
+          : "border border-slate-800 bg-slate-950 focus-visible:ring-offset-slate-950"
+      }`}
+    >
+      {/* Zoom and Center Controls overlaid on the map UI */}
+      <div className="absolute top-2 right-2 z-30 flex flex-col gap-1 select-none pointer-events-auto">
+        <button
+          type="button"
+          onClick={handleZoomIn}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleZoomIn();
+            }
+          }}
+          className={`p-1 w-7 h-7 rounded-lg border flex items-center justify-center transition-all cursor-pointer shadow-lg active:scale-90 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+            daylightHighContrast
+              ? "bg-white text-black border-2 border-black hover:bg-zinc-100 focus-visible:ring-black focus-visible:ring-offset-white"
+              : "bg-slate-900/90 hover:bg-slate-800 text-white border-slate-800 focus-visible:ring-indigo-500 focus-visible:ring-offset-slate-905"
+          }`}
+          title="Zoom In"
+          aria-label="Zoom In"
+        >
+          <Plus className="w-4 h-4 font-black" />
+        </button>
+        <button
+          type="button"
+          onClick={handleZoomOut}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleZoomOut();
+            }
+          }}
+          className={`p-1 w-7 h-7 rounded-lg border flex items-center justify-center transition-all cursor-pointer shadow-lg active:scale-90 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+            daylightHighContrast
+              ? "bg-white text-black border-2 border-black hover:bg-zinc-100 focus-visible:ring-black focus-visible:ring-offset-white"
+              : "bg-slate-900/90 hover:bg-slate-800 text-white border-slate-800 focus-visible:ring-indigo-500 focus-visible:ring-offset-slate-905"
+          }`}
+          title="Zoom Out"
+          aria-label="Zoom Out"
+        >
+          <Minus className="w-4 h-4 font-black" />
+        </button>
+        <button
+          type="button"
+          onClick={handleCenterJob}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleCenterJob();
+            }
+          }}
+          className={`p-1 w-7 h-7 rounded-lg border flex items-center justify-center transition-all cursor-pointer shadow-lg active:scale-90 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+            daylightHighContrast
+              ? "bg-white text-black border-2 border-black hover:bg-zinc-100 focus-visible:ring-black focus-visible:ring-offset-white"
+              : "bg-slate-900/90 hover:bg-slate-800 text-indigo-400 border-slate-800 focus-visible:ring-indigo-500 focus-visible:ring-offset-slate-905"
+          }`}
+          title="Center on Job Site"
+          aria-label="Center on Job Site"
+        >
+          <MapPin className="w-3.5 h-3.5" />
+        </button>
+        {currentCoord && (
+          <button
+            type="button"
+            onClick={handleCenterTech}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleCenterTech();
+              }
+            }}
+            className={`p-1 w-7 h-7 rounded-lg border flex items-center justify-center transition-all cursor-pointer shadow-lg active:scale-90 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+              daylightHighContrast
+                ? "bg-white text-black border-2 border-black hover:bg-zinc-100 focus-visible:ring-black focus-visible:ring-offset-white"
+                : "bg-slate-900/90 hover:bg-slate-800 text-emerald-400 border-slate-800 focus-visible:ring-emerald-500 focus-visible:ring-offset-slate-905"
+            }`}
+            title="Center on Technician"
+            aria-label="Center on Technician"
+          >
+            <Navigation className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Digital scale marker bottom right */}
+      <div className={`absolute bottom-2 right-2 z-30 px-2 py-0.5 rounded text-[8px] font-mono border select-none ${
+        daylightHighContrast
+          ? "bg-white text-black border-black font-black"
+          : "bg-slate-955 text-sky-400 border-slate-800"
+      }`}>
+        Zoom: {zoom}x
+      </div>
+
+      {hasValidMapKey ? (
+        <APIProvider apiKey={GOOGLE_MAPS_KEY} version="weekly">
+          <Map
+            center={center}
+            zoom={zoom}
+            onCameraChanged={handleCameraChange}
+            mapId="AASTACLEAN_CREW_MAP"
+            mapTypeId={mapMode}
+            internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+            style={{ width: '105%', height: '105%' }}
+            disableDefaultUI={true}
+          >
+            <AdvancedMarker position={{ lat: pcodeDetails.lat, lng: pcodeDetails.lng }}>
+              <Pin background="#4f46e5" glyphColor="#fff" scale={1} />
+            </AdvancedMarker>
+
+            {/* Visual 50-meter Geofence circle on the real Google Map */}
+            <AdvancedMarker position={{ lat: pcodeDetails.lat, lng: pcodeDetails.lng }}>
+              <div className="relative -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none select-none">
+                <div className="w-[120px] h-[120px] rounded-full border-2 border-dashed border-indigo-500/50 bg-indigo-500/10 animate-[pulse_3s_infinite] flex items-center justify-center">
+                  <span className="text-[7.5px] font-bold text-indigo-400 uppercase tracking-widest font-mono">50m Geofence</span>
+                </div>
+              </div>
+            </AdvancedMarker>
+
+            {/* Cleaner Real-time GPS Position Overlay Marker on Google Maps if active */}
+            {currentCoord && (
+              <AdvancedMarker position={{ lat: currentCoord.lat, lng: currentCoord.lng }}>
+                <div className="flex flex-col items-center justify-center scale-90 translate-y-[-10px] select-none">
+                  <div className="bg-emerald-500 text-white rounded-full p-1.5 shadow-xl border-2 border-white animate-bounce">
+                    🚗
+                  </div>
+                  <span className="bg-slate-950 border border-slate-805 text-white text-[7px] font-black tracking-widest uppercase px-1 rounded block font-mono">
+                    CREW GPS
+                  </span>
+                </div>
+              </AdvancedMarker>
+            )}
+          </Map>
+        </APIProvider>
+      ) : (
+        // Beautiful simulated vector map mesh complying with custom mapping falls back gracefully and explains keys.
+        <div className={`absolute inset-0 p-4 flex flex-col justify-between overflow-hidden transition-all ${
+          mapMode === "satellite"
+            ? (daylightHighContrast ? "bg-zinc-900 text-white" : "bg-slate-955 text-sky-400")
+            : (daylightHighContrast ? "bg-white text-black" : "bg-slate-955 text-slate-300")
+        }`}>
+          {/* Simulated Vector Coordinates Mesh Background */}
+          <div className={`absolute inset-0 opacity-15 pointer-events-none ${
+            mapMode === "satellite"
+              ? "bg-[radial-gradient(#38bdf8_1px,transparent_1px)]"
+              : (daylightHighContrast ? "bg-[radial-gradient(#000000_1px,transparent_1px)]" : "bg-[radial-gradient(#312e81_1px,transparent_1px)]")
+          } [background-size:16px_16px]`} />
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className={`w-24 h-24 rounded-full border absolute ${
+              mapMode === "satellite"
+                ? "border-sky-500/20 animate-ping"
+                : (daylightHighContrast ? "border-black/20" : "border-indigo-500/20")
+            }`} />
+            <div className={`w-36 h-36 rounded-full border absolute ${
+              mapMode === "satellite"
+                ? "border-sky-500/10"
+                : (daylightHighContrast ? "border-black/10" : "border-indigo-500/10")
+            }`} />
+          </div>
+
+          {/* Center Client Job Site Destination Marker relative to center / zoom */}
+          {(() => {
+            const zoomMultiplier = Math.pow(2, zoom - 13);
+            const siteDx = (pcodeDetails.lat - center.lat) * zoomMultiplier * 1000;
+            const siteDy = (pcodeDetails.lng - center.lng) * zoomMultiplier * 1000;
+            
+            const siteLeft = 50 + siteDy * 12;
+            const siteTop = 50 - siteDx * 12;
+
+            // Only display job site if it is within reasonable visual boundaries (fallback margin clamp)
+            if (siteLeft < -20 || siteLeft > 120 || siteTop < -20 || siteTop > 120) return null;
+
+            return (
+              <div 
+                className="absolute z-20 flex flex-col items-center justify-center pointer-events-none transition-all duration-300"
+                style={{ left: `${siteLeft}%`, top: `${siteTop}%` }}
+              >
+                <div className="w-5 h-5 bg-indigo-600 rounded-full flex items-center justify-center border-2 border-white shadow-xl animate-pulse">
+                  <MapPin className="w-3 h-3 text-white" />
+                </div>
+                <span className={`text-[7px] font-black uppercase px-1 mt-0.5 rounded shadow ${
+                  daylightHighContrast ? "bg-black text-white" : "bg-slate-900/90 text-indigo-300"
+                }`}>
+                  JOB SITE
+                </span>
+              </div>
+            );
+          })()}
+
+          {/* 50-meter Geofence Boundary Visual Range Indicator (Circle) relative to center / zoom */}
+          {(() => {
+            const zoomMultiplier = Math.pow(2, zoom - 13);
+            const siteDx = (pcodeDetails.lat - center.lat) * zoomMultiplier * 1000;
+            const siteDy = (pcodeDetails.lng - center.lng) * zoomMultiplier * 1000;
+            
+            const siteLeft = 50 + siteDy * 12;
+            const siteTop = 50 - siteDx * 12;
+
+            if (siteLeft < -20 || siteLeft > 120 || siteTop < -20 || siteTop > 120) return null;
+
+            // Visual diameter scales with zoom
+            const diameter = 112 * zoomMultiplier;
+
+            return (
+              <div 
+                className="absolute z-10 rounded-full border-2 border-dashed border-indigo-500/50 bg-indigo-500/10 animate-[pulse_3s_infinite] pointer-events-none flex items-center justify-center transition-all duration-300 -translate-x-1/2 -translate-y-1/2"
+                style={{ 
+                  left: `${siteLeft}%`, 
+                  top: `${siteTop}%`,
+                  width: `${Math.max(40, Math.min(300, diameter))}px`,
+                  height: `${Math.max(40, Math.min(300, diameter))}px`
+                }}
+              >
+                <span className="text-[6.5px] font-black text-indigo-400 bg-slate-950/45 px-1.5 py-0.5 rounded font-mono uppercase tracking-wider">50m Geofence</span>
+              </div>
+            );
+          })()}
+
+          {/* Real-time Moving GPS Tracker Overlaid */}
+          {currentCoord && (() => {
+            const zoomMultiplier = Math.pow(2, zoom - 13);
+            const dx = (currentCoord.lat - center.lat) * zoomMultiplier * 1000;
+            const dy = (currentCoord.lng - center.lng) * zoomMultiplier * 1000;
+            
+            const leftVal = 50 + dy * 12;
+            const topVal = 50 - dx * 12;
+
+            if (leftVal < -20 || leftVal > 120 || topVal < -20 || topVal > 120) return null;
+            
+            return (
+              <div 
+                className="absolute z-20 transition-all duration-1000 ease-linear flex flex-col items-center justify-center select-none"
+                style={{ left: `${leftVal}%`, top: `${topVal}%` }}
+              >
+                <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white shadow-xl animate-bounce">
+                  🚗
+                </div>
+                <span className={`text-[6px] font-black uppercase px-1 py-0.5 rounded shadow whitespace-nowrap ${
+                  daylightHighContrast ? "bg-black text-white" : "bg-emerald-950 text-emerald-400 border border-emerald-900"
+                }`}>
+                  CREW: {job.bookingStatus.toUpperCase()}
+                </span>
+              </div>
+            );
+          })()}
+
+          <div className={`z-10 p-2 border flex justify-between items-start text-[10px] leading-normal font-mono ${
+            mapMode === "satellite"
+              ? "bg-slate-900/95 border-sky-800 text-sky-400"
+              : (daylightHighContrast ? "bg-white border-black text-black font-bold" : "bg-slate-900/90 border-slate-800 text-slate-400")
+          }`}>
+            <p className="max-w-xs font-mono">
+              {mapMode === "satellite" ? (
+                <span>📡 Satellite Orbits Locked: <span className="text-white font-black">{pcodeDetails.label}</span> Dispatch Telemetry tracking active at {center.lat.toFixed(4)}, {center.lng.toFixed(4)} with real-time GPS telemetry...</span>
+              ) : (
+                <span>🗺️ Suburb coordinates mapping: <span className={daylightHighContrast ? "text-black underline font-black" : "text-white font-bold"}>{pcodeDetails.label}</span> Map Center at <span>{center.lat.toFixed(4)}, {center.lng.toFixed(4)}</span>.</span>
+              )}
+            </p>
+          </div>
+
+          <div className={`z-10 p-2 px-3 border flex items-center justify-between text-[11px] mt-auto ${
+            mapMode === "satellite"
+              ? "bg-slate-905 border-sky-950 text-slate-300"
+              : (daylightHighContrast ? "bg-white border-black text-black" : "bg-slate-950 border-slate-800")
+          }`}>
+            <span className={`font-semibold font-sans flex items-center gap-1 ${
+              mapMode === "satellite"
+                ? "text-sky-400"
+                : (daylightHighContrast ? "text-black font-black" : "text-amber-400")
+            }`}>
+              <AlertCircle className="w-3.5 h-3.5" /> API Key Not Active (Simulated {mapMode === "satellite" ? "Satellite" : "Road"} Mode)
+            </span>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => {
+                  alert("To configure Google Maps API key:\n1. Get a key at console.cloud.google.com\n2. Open Settings (⚙️ top right) -> Secrets\n3. Add 'GOOGLE_MAPS_PLATFORM_KEY' and paste key.");
+                }}
+                className={`text-[9px] font-bold p-1 px-2.5 rounded cursor-pointer ${daylightHighContrast ? "bg-black text-white hover:bg-black/90" : "bg-indigo-600 hover:bg-indigo-500 text-white"}`}
+              >
+                Help Setup API Key
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CleanersApp({ 
   quotes, 
   cleaners, 
@@ -265,6 +660,20 @@ export default function CleanersApp({
   const [dragOffsets, setDragOffsets] = useState<Record<string, number>>({});
   const [activeDragJob, setActiveDragJob] = useState<{ id: string; startX: number } | null>(null);
   const [cleanerGpsCoords, setCleanerGpsCoords] = useState<Record<string, { lat: number; lng: number; bearing: number }>>({});
+  const [gpsTelemetryHistory, setGpsTelemetryHistory] = useState<Record<string, Array<{ lat: number; lng: number; bearing: number; timestamp: string; bookingStatus: string }>>>(() => {
+    try {
+      const saved = localStorage.getItem("aastaclean_gps_telemetry_history");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("aastaclean_gps_telemetry_history", JSON.stringify(gpsTelemetryHistory));
+    } catch (e) {}
+  }, [gpsTelemetryHistory]);
 
   // --- PHASE 2: ADVANCED SHIFT CLOCKING STATES ---
   const [shiftClockedIn, setShiftClockedIn] = useState<boolean>(() => {
@@ -668,14 +1077,17 @@ export default function CleanersApp({
       setCleanerGpsCoords(prev => {
         const next = { ...prev };
         const activeCleanerJobs = projectedQuotes.filter(q => q.assignedCleaner === activeCleanerName);
+        const newHistoryEntries: Record<string, { lat: number; lng: number; bearing: number; timestamp: string; bookingStatus: string }> = {};
+
         activeCleanerJobs.forEach(job => {
           if (job.bookingStatus === "en-route" || job.bookingStatus === "in-progress") {
             const dest = SUBURB_MAP[job.postcode] || { lat: -31.9505, lng: 115.8605, label: "Perth" };
             const current = prev[job.id];
+            let updatedCoord;
             
             if (!current) {
               // Start further away representing dispatch station
-              next[job.id] = {
+              updatedCoord = {
                 lat: dest.lat - 0.012,
                 lng: dest.lng - 0.012,
                 bearing: 45
@@ -694,18 +1106,44 @@ export default function CleanersApp({
                 const nextLat = current.lat + dx * step;
                 const nextLng = current.lng + dy * step;
                 const bearing = Math.atan2(dy, dx) * (180 / Math.PI);
-                next[job.id] = { lat: nextLat, lng: nextLng, bearing };
+                updatedCoord = { lat: nextLat, lng: nextLng, bearing };
               } else {
                 // jitter simulated live telemetry
-                next[job.id] = {
+                updatedCoord = {
                   lat: targetLat + (Math.random() - 0.5) * 0.0001,
                   lng: targetLng + (Math.random() - 0.5) * 0.0001,
                   bearing: current.bearing + (Math.random() - 0.5) * 20
                 };
               }
             }
+
+            next[job.id] = updatedCoord;
+            newHistoryEntries[job.id] = {
+              lat: updatedCoord.lat,
+              lng: updatedCoord.lng,
+              bearing: updatedCoord.bearing,
+              timestamp: new Date().toLocaleTimeString(),
+              bookingStatus: job.bookingStatus
+            };
           }
         });
+
+        // Batch update telemetry history
+        if (Object.keys(newHistoryEntries).length > 0) {
+          setGpsTelemetryHistory(prevHist => {
+            const nextHist = { ...prevHist };
+            Object.entries(newHistoryEntries).forEach(([jobId, entry]) => {
+              const arr = nextHist[jobId] || [];
+              const nextArr = [...arr, entry];
+              if (nextArr.length > 200) {
+                nextArr.shift(); // keep last 200 items per job
+              }
+              nextHist[jobId] = nextArr;
+            });
+            return nextHist;
+          });
+        }
+
         return next;
       });
     }, 1200);
@@ -1577,6 +2015,43 @@ export default function CleanersApp({
     });
 
     setSelectedJobIds([]);
+  };
+
+  const downloadGpsTelemetry = (jobId: string, suburbName: string) => {
+    const logs = gpsTelemetryHistory[jobId] || [];
+    
+    // Generate JSON document payload
+    const payload = {
+      technicianName: activeCleanerName,
+      jobId: jobId,
+      destinationSuburb: suburbName,
+      extractedAt: new Date().toISOString(),
+      telemetryRecordsCount: logs.length,
+      logs: logs.map((log: any, index: number) => ({
+        index: index + 1,
+        lat: Number(log.lat.toFixed(6)),
+        lng: Number(log.lng.toFixed(6)),
+        bearing: Number(log.bearing.toFixed(2)),
+        timestamp: log.timestamp,
+        phase: log.bookingStatus
+      }))
+    };
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payload, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `aastaclean_gps_telem_job_${jobId.slice(-6).toUpperCase()}_${suburbName.toLowerCase().replace(/\s+/g, '_')}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+
+    onTriggerLog({
+      id: `gps_download_${jobId}_${Date.now()}`,
+      type: "system",
+      status: "success",
+      message: `📥 GPS telemetry logs exported successfully for Job #${jobId.slice(-6).toUpperCase()} (${logs.length} data points exported).`,
+      timestamp: new Date().toLocaleTimeString()
+    });
   };
 
   // ⏱️ Start site arrival timer
@@ -4037,158 +4512,35 @@ export default function CleanersApp({
                               <span className={`text-[10px] font-bold px-2 py-0.5 border uppercase font-mono ${daylightHighContrast ? "bg-black text-white border-black" : "bg-slate-955 text-slate-500 border-slate-850"}`}>
                                 Geo-Postcode: {job.postcode}
                               </span>
+
+                              <button
+                                type="button"
+                                onClick={() => downloadGpsTelemetry(job.id, job.suburb || "Area")}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all border cursor-pointer select-none ${
+                                  daylightHighContrast
+                                    ? "bg-black hover:bg-zinc-800 text-white border-black animate-pulse"
+                                    : "bg-emerald-600 hover:bg-emerald-700 hover:scale-[1.02] active:scale-95 text-white border-emerald-500/30"
+                                }`}
+                                title="Download real-time technician GPS tracking path and breadcrumb telemetry JSON log file"
+                              >
+                                <Download className="w-3 h-3" />
+                                <span>Export GPS ({gpsTelemetryHistory[job.id]?.length || 0})</span>
+                              </button>
                             </div>
                           </div>
 
-                          <div className={`w-full h-44 rounded-2xl overflow-hidden relative flex flex-col items-center justify-center ${daylightHighContrast ? "border-2 border-black bg-white" : "border border-slate-800 bg-slate-950"}`}>
-                            {hasValidMapKey ? (
-                              <APIProvider apiKey={GOOGLE_MAPS_KEY} version="weekly">
-                                <Map
-                                  defaultCenter={{ lat: pcodeDetails.lat, lng: pcodeDetails.lng }}
-                                  defaultZoom={13}
-                                  mapId="AASTACLEAN_CREW_MAP"
-                                  mapTypeId={mapMode}
-                                  internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
-                                  style={{ width: '105%', height: '105%' }}
-                                  disableDefaultUI={true}
-                                >
-                                  <AdvancedMarker position={{ lat: pcodeDetails.lat, lng: pcodeDetails.lng }}>
-                                    <Pin background="#4f46e5" glyphColor="#fff" scale={1} />
-                                  </AdvancedMarker>
-
-                                  {/* Visual 50-meter Geofence circle on the real Google Map */}
-                                  <AdvancedMarker position={{ lat: pcodeDetails.lat, lng: pcodeDetails.lng }}>
-                                    <div className="relative -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none select-none">
-                                      <div className="w-[120px] h-[120px] rounded-full border-2 border-dashed border-indigo-500/50 bg-indigo-500/10 animate-[pulse_3s_infinite] flex items-center justify-center">
-                                        <span className="text-[7.5px] font-bold text-indigo-400 uppercase tracking-widest font-mono">50m Geofence</span>
-                                      </div>
-                                    </div>
-                                  </AdvancedMarker>
-
-                                  {/* Cleaner Real-time GPS Position Overlay Marker on Google Maps if active */}
-                                  {cleanerGpsCoords[job.id] && (
-                                    <AdvancedMarker position={{ lat: cleanerGpsCoords[job.id].lat, lng: cleanerGpsCoords[job.id].lng }}>
-                                      <div className="flex flex-col items-center justify-center scale-90 translate-y-[-10px] select-none">
-                                        <div className="bg-emerald-500 text-white rounded-full p-1.5 shadow-xl border-2 border-white animate-bounce">
-                                          🚗
-                                        </div>
-                                        <span className="bg-slate-950 border border-slate-805 text-white text-[7px] font-black tracking-widest uppercase px-1 rounded block font-mono">
-                                          CREW GPS
-                                        </span>
-                                      </div>
-                                    </AdvancedMarker>
-                                  )}
-                                </Map>
-                              </APIProvider>
-                            ) : (
-                              // Beautiful simulated vector map mesh complying with custom mapping falls back gracefully and explains keys.
-                              <div className={`absolute inset-0 p-4 flex flex-col justify-between overflow-hidden transition-all ${
-                                mapMode === "satellite"
-                                  ? (daylightHighContrast ? "bg-zinc-900 text-white" : "bg-slate-955 text-sky-400")
-                                  : (daylightHighContrast ? "bg-white text-black" : "bg-slate-955 text-slate-300")
-                              }`}>
-                                {/* Simulated Vector Coordinates Mesh Background */}
-                                <div className={`absolute inset-0 opacity-15 pointer-events-none ${
-                                  mapMode === "satellite"
-                                    ? "bg-[radial-gradient(#38bdf8_1px,transparent_1px)]"
-                                    : (daylightHighContrast ? "bg-[radial-gradient(#000000_1px,transparent_1px)]" : "bg-[radial-gradient(#312e81_1px,transparent_1px)]")
-                                } [background-size:16px_16px]`} />
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                  <div className={`w-24 h-24 rounded-full border absolute ${
-                                    mapMode === "satellite"
-                                      ? "border-sky-500/20 animate-ping"
-                                      : (daylightHighContrast ? "border-black/20" : "border-indigo-500/20")
-                                  }`} />
-                                  <div className={`w-36 h-36 rounded-full border absolute ${
-                                    mapMode === "satellite"
-                                      ? "border-sky-500/10"
-                                      : (daylightHighContrast ? "border-black/10" : "border-indigo-500/10")
-                                  }`} />
-                                </div>
-
-                                {/* Center Client Job Site Destination Marker */}
-                                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center justify-center pointer-events-none">
-                                  <div className="w-5 h-5 bg-indigo-600 rounded-full flex items-center justify-center border-2 border-white shadow-xl animate-pulse">
-                                    <MapPin className="w-3 h-3 text-white" />
-                                  </div>
-                                  <span className={`text-[7px] font-black uppercase px-1 mt-0.5 rounded shadow ${
-                                    daylightHighContrast ? "bg-black text-white" : "bg-slate-900/90 text-indigo-300"
-                                  }`}>
-                                    JOB SITE
-                                  </span>
-                                </div>
-
-                                {/* 50-meter Geofence Boundary Visual Range Indicator (Circle) */}
-                                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-28 h-28 rounded-full border-2 border-dashed border-indigo-500/50 bg-indigo-500/10 animate-[pulse_3s_infinite] pointer-events-none flex items-center justify-center">
-                                  <span className="text-[7.5px] font-black text-indigo-400 bg-slate-950/40 px-1.5 py-0.5 rounded font-mono uppercase tracking-wider">50m Geofence</span>
-                                </div>
-
-                                {/* Real-time Moving GPS Tracker Overlaid */}
-                                {cleanerGpsCoords[job.id] && (() => {
-                                  const currentC = cleanerGpsCoords[job.id];
-                                  const dest = SUBURB_MAP[job.postcode] || { lat: -31.9505, lng: 115.8605 };
-                                  const dx = (currentC.lat - dest.lat) / 0.015;
-                                  const dy = (currentC.lng - dest.lng) / 0.015;
-                                  const leftVal = Math.max(12, Math.min(88, 50 + dy * 35));
-                                  const topVal = Math.max(12, Math.min(88, 50 - dx * 35));
-                                  
-                                  return (
-                                    <div 
-                                      className="absolute z-20 transition-all duration-1000 ease-linear flex flex-col items-center justify-center select-none"
-                                      style={{ left: `${leftVal}%`, top: `${topVal}%` }}
-                                    >
-                                      <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white shadow-xl animate-bounce">
-                                        🚗
-                                      </div>
-                                      <span className={`text-[6px] font-black uppercase px-1 py-0.5 rounded shadow whitespace-nowrap ${
-                                        daylightHighContrast ? "bg-black text-white" : "bg-emerald-950 text-emerald-400 border border-emerald-900"
-                                      }`}>
-                                        CREW: {job.bookingStatus.toUpperCase()}
-                                      </span>
-                                    </div>
-                                  );
-                                })()}
-
-                                <div className={`z-10 p-2 border flex justify-between items-start text-[10px] leading-normal font-mono ${
-                                  mapMode === "satellite"
-                                    ? "bg-slate-900/95 border-sky-800 text-sky-400"
-                                    : (daylightHighContrast ? "bg-white border-black text-black font-bold" : "bg-slate-900/90 border-slate-800 text-slate-400")
-                                }`}>
-                                  <p className="max-w-xs font-mono">
-                                    {mapMode === "satellite" ? (
-                                      <span>📡 Satellite Orbits Locked: <span className="text-white font-black">{pcodeDetails.label}</span> Dispatch Telemetry tracking active at {pcodeDetails.lat.toFixed(4)}, {pcodeDetails.lng.toFixed(4)} with real-time GPS telemetry...</span>
-                                    ) : (
-                                      <span>🗺️ Suburb coordinates mapping: <span className={daylightHighContrast ? "text-black underline font-black" : "text-white font-bold"}>{pcodeDetails.label}</span> Area center point loaded at <span>{pcodeDetails.lat.toFixed(4)}, {pcodeDetails.lng.toFixed(4)}</span>.</span>
-                                    )}
-                                  </p>
-                                </div>
-
-                                <div className={`z-10 p-2 px-3 border flex items-center justify-between text-[11px] mt-auto ${
-                                  mapMode === "satellite"
-                                    ? "bg-slate-905 border-sky-950 text-slate-300"
-                                    : (daylightHighContrast ? "bg-white border-black text-black" : "bg-slate-950 border-slate-800")
-                                }`}>
-                                  <span className={`font-semibold font-sans flex items-center gap-1 ${
-                                    mapMode === "satellite"
-                                      ? "text-sky-400"
-                                      : (daylightHighContrast ? "text-black font-black" : "text-amber-400")
-                                  }`}>
-                                    <AlertCircle className="w-3.5 h-3.5" /> API Key Not Active (Simulated {mapMode === "satellite" ? "Satellite" : "Road"} Mode)
-                                  </span>
-                                  <div className="flex gap-2">
-                                    <button 
-                                      onClick={() => {
-                                        alert("To configure Google Maps API key:\n1. Get a key at console.cloud.google.com\n2. Open Settings (⚙️ top right) -> Secrets\n3. Add 'GOOGLE_MAPS_PLATFORM_KEY' and paste key.");
-                                      }}
-                                      className={`text-[9px] font-bold p-1 px-2.5 rounded cursor-pointer ${daylightHighContrast ? "bg-black text-white hover:bg-black/90" : "bg-indigo-600 hover:bg-indigo-500 text-white"}`}
-                                    >
-                                      Help Setup API Key
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
+                          <TechnicianMapContainer
+                            job={job}
+                            pcodeDetails={pcodeDetails}
+                            cleanerGpsCoords={cleanerGpsCoords}
+                            daylightHighContrast={daylightHighContrast}
+                            hasValidMapKey={hasValidMapKey}
+                            GOOGLE_MAPS_KEY={GOOGLE_MAPS_KEY}
+                            mapMode={mapMode}
+                            setMapMode={setMapMode}
+                            onTriggerLog={onTriggerLog}
+                            gpsTelemetryHistory={gpsTelemetryHistory}
+                          />
                         </div>
 
                          {/* Checklist Tracker Panel */}

@@ -664,6 +664,7 @@ function AppContent() {
         <ServiceExplorer
           onOpenQuote={handleOpenQuote}
           services={dynServices}
+          onChangeView={handleViewChange}
         />
       ) : currentView === "pricing" ? (
         <PricingCalculator

@@ -27,9 +27,10 @@ import { addonRegistry } from "../servicesCatalog";
 interface ServiceExplorerProps {
   onOpenQuote: (service?: string) => void;
   services?: ServiceItem[];
+  onChangeView?: (view: "client" | "admin" | "cleaner" | "seo" | "developer" | "services" | "pricing" | "dashboard" | "city-hub") => void;
 }
 
-export default function ServiceExplorer({ onOpenQuote, services = allServices }: ServiceExplorerProps) {
+export default function ServiceExplorer({ onOpenQuote, services = allServices, onChangeView }: ServiceExplorerProps) {
   const [selectedCategory, setSelectedCategory] = useState<"All" | "Commercial" | "Domestic" | "Specialised">("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeServiceSlug, setActiveServiceSlug] = useState<string>("commercial-cleaning");
@@ -365,9 +366,21 @@ export default function ServiceExplorer({ onOpenQuote, services = allServices }:
               
               <button
                 onClick={() => {
-                  window.location.hash = "#coverage";
-                  const target = document.getElementById("coverage");
-                  if (target) target.scrollIntoView({ behavior: "smooth" });
+                  if (onChangeView) {
+                    onChangeView("client");
+                    setTimeout(() => {
+                      const target = document.getElementById("coverage");
+                      if (target) {
+                        target.scrollIntoView({ behavior: "smooth" });
+                      } else {
+                        window.location.hash = "#coverage";
+                      }
+                    }, 100);
+                  } else {
+                    window.location.hash = "#coverage";
+                    const target = document.getElementById("coverage");
+                    if (target) target.scrollIntoView({ behavior: "smooth" });
+                  }
                 }}
                 className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 py-4 px-6 rounded-2xl text-xs font-bold font-sans tracking-wide text-center cursor-pointer transition-colors"
               >

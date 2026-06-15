@@ -380,6 +380,244 @@ Please ensure package imports and network bindings are fully synchronized.`
     return res.json({ success: true, message: "Credentials locked, encrypted using AES-256 and stored safely." });
   });
 
+  // Sovereign Postal Mail Server Configuration Cache
+  let mPostalConfig = {
+    smtpHost: process.env.POSTAL_SMTP_HOST || "postal.aastaclean.com.au",
+    smtpPort: parseInt(process.env.POSTAL_SMTP_PORT || "587"),
+    authUser: encryptCredential(process.env.POSTAL_SMTP_USER || "aastaclean-mail-relay"),
+    authPass: encryptCredential(process.env.POSTAL_SMTP_PASS || "postal-auth-token-xyz-123"),
+    senderDomain: process.env.POSTAL_SENDER_DOMAIN || "aastaclean.com.au",
+    dkimSelector: "postal",
+    spfStatus: "verified",
+    dkimStatus: "verified",
+    dmarcStatus: "verified",
+    ipReputation: 99,
+    warmupPhase: 4, // 1 to 5
+    dailyLimit: 25000,
+    dailySent: 4320,
+    updatedAt: new Date().toISOString()
+  };
+
+  let mPostalLogs = [
+    {
+      id: "pst_log_9022",
+      recipient: "sarah.reynolds@enterprise.com.au",
+      sender: "dispatch@aastaclean.com.au",
+      subject: "Official Quotation (Perth West - Postcode 6007)",
+      timestamp: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
+      status: "delivered", // delivered, bounced, deferred, complaint
+      type: "transactional",
+      code: "250 OK (RFC 5321 Delivery)",
+      latencyMs: 340,
+      sizeBytes: 15420
+    },
+    {
+      id: "pst_log_9021",
+      recipient: "liam.vance@aastaclean.com.au",
+      sender: "dispatch@aastaclean.com.au",
+      subject: "Crew Scheduling Checklist Notification",
+      timestamp: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
+      status: "delivered",
+      type: "transactional",
+      code: "250 OK (RFC 5321 Delivery)",
+      latencyMs: 180,
+      sizeBytes: 8120
+    },
+    {
+      id: "pst_log_9020",
+      recipient: "bounced-test@invalid-domain-gmail.au",
+      sender: "no-reply@aastaclean.com.au",
+      subject: "Handover Survey Verification",
+      timestamp: new Date(Date.now() - 6 * 3600 * 1000).toISOString(),
+      status: "bounced",
+      type: "transactional",
+      code: "550 User Unknown (Local SMTP Bounce)",
+      latencyMs: 110,
+      sizeBytes: 4230
+    },
+    {
+      id: "pst_log_9019",
+      recipient: "subscriber-list@aastaclean.com.au",
+      sender: "marketing@aastaclean.com.au",
+      subject: "Sovereign Deep Sanitation & Silica Hazard Compliance Ebook",
+      timestamp: new Date(Date.now() - 12 * 3600 * 1000).toISOString(),
+      status: "delivered",
+      type: "marketing",
+      code: "250 OK (Bulk Delivery Queued)",
+      latencyMs: 820,
+      sizeBytes: 44102
+    }
+  ];
+
+  app.get("/api/v1/postal/config", (req, res) => {
+    return res.json({
+      smtpHost: mPostalConfig.smtpHost,
+      smtpPort: mPostalConfig.smtpPort,
+      authUserMasked: "••••••••••••••••••••" + decryptCredential(mPostalConfig.authUser).slice(-3),
+      authPassMasked: "••••••••••••••••••••" + decryptCredential(mPostalConfig.authPass).slice(-3),
+      senderDomain: mPostalConfig.senderDomain,
+      dkimSelector: mPostalConfig.dkimSelector,
+      spfStatus: mPostalConfig.spfStatus,
+      dkimStatus: mPostalConfig.dkimStatus,
+      dmarcStatus: mPostalConfig.dmarcStatus,
+      ipReputation: mPostalConfig.ipReputation,
+      warmupPhase: mPostalConfig.warmupPhase,
+      dailyLimit: mPostalConfig.dailyLimit,
+      dailySent: mPostalConfig.dailySent,
+      updatedAt: mPostalConfig.updatedAt
+    });
+  });
+
+  app.post("/api/v1/postal/config", express.json(), (req, res) => {
+    const { smtpHost, smtpPort, authUser, authPass, senderDomain, dkimSelector, spfStatus, dkimStatus, dmarcStatus, ipReputation, warmupPhase } = req.body;
+
+    if (smtpHost) mPostalConfig.smtpHost = smtpHost;
+    if (smtpPort) mPostalConfig.smtpPort = Number(smtpPort);
+    
+    if (authUser && !authUser.startsWith("••••")) {
+      mPostalConfig.authUser = encryptCredential(authUser);
+    }
+    if (authPass && !authPass.startsWith("••••")) {
+      mPostalConfig.authPass = encryptCredential(authPass);
+    }
+
+    if (senderDomain) mPostalConfig.senderDomain = senderDomain;
+    if (dkimSelector) mPostalConfig.dkimSelector = dkimSelector;
+    if (spfStatus) mPostalConfig.spfStatus = spfStatus;
+    if (dkimStatus) mPostalConfig.dkimStatus = dkimStatus;
+    if (dmarcStatus) mPostalConfig.dmarcStatus = dmarcStatus;
+    if (ipReputation !== undefined) mPostalConfig.ipReputation = Number(ipReputation);
+    if (warmupPhase !== undefined) mPostalConfig.warmupPhase = Number(warmupPhase);
+
+    mPostalConfig.updatedAt = new Date().toISOString();
+    return res.json({ success: true, message: "Sovereign Postal SMTP configuration updated and encrypted securely." });
+  });
+
+  app.get("/api/v1/postal/logs", (req, res) => {
+    return res.json(mPostalLogs);
+  });
+
+  app.get("/api/v1/postal/reputation", (req, res) => {
+    return res.json({
+      reputationScore: mPostalConfig.ipReputation,
+      warmupPhase: mPostalConfig.warmupPhase,
+      limits: {
+        1: 500,
+        2: 2500,
+        3: 10000,
+        4: 25000,
+        5: 100000
+      }[mPostalConfig.warmupPhase] || 25000,
+      activeBounces: mPostalLogs.filter(l => l.status === "bounced").length,
+      complaints: mPostalLogs.filter(l => l.status === "complaint").length,
+      dnsVerified: mPostalConfig.spfStatus === "verified" && mPostalConfig.dkimStatus === "verified" && mPostalConfig.dmarcStatus === "verified"
+    });
+  });
+
+  app.post("/api/v1/postal/toggle-dns", express.json(), (req, res) => {
+    const { key, value } = req.body;
+    if (key === "spf") mPostalConfig.spfStatus = value;
+    if (key === "dkim") mPostalConfig.dkimStatus = value;
+    if (key === "dmarc") mPostalConfig.dmarcStatus = value;
+    return res.json({ success: true, message: `${key.toUpperCase()} status updated to ${value}` });
+  });
+
+  app.post("/api/v1/postal/send", express.json(), async (req, res) => {
+    const { recipient, subject, body, type } = req.body;
+    
+    if (!recipient || !subject || !body) {
+      return res.status(400).json({ error: "Missing required parameters: recipient, subject, or body" });
+    }
+
+    const host = mPostalConfig.smtpHost;
+    const port = mPostalConfig.smtpPort;
+    const user = decryptCredential(mPostalConfig.authUser);
+    const pass = decryptCredential(mPostalConfig.authPass);
+    const sender = `dispatch@${mPostalConfig.senderDomain}`;
+
+    const newLogId = `pst_log_${Math.floor(Math.random() * 90000 + 10000)}`;
+    const logEntry = {
+      id: newLogId,
+      recipient,
+      sender,
+      subject,
+      timestamp: new Date().toISOString(),
+      status: "delivered" as any,
+      type: type || "transactional",
+      code: "250 OK (RFC 5321 Delivery)",
+      latencyMs: 120,
+      sizeBytes: Buffer.byteLength(body, "utf8")
+    };
+
+    const isMock = host === "postal.aastaclean.com.au" && user === "aastaclean-mail-relay";
+    
+    if (!isMock) {
+      try {
+        const nodemailer = await import("nodemailer");
+        const transporter = nodemailer.createTransport({
+          host,
+          port,
+          secure: port === 465,
+          auth: {
+            user,
+            pass
+          }
+        });
+
+        const start = Date.now();
+        await transporter.sendMail({
+          from: sender,
+          to: recipient,
+          subject: subject,
+          text: body,
+          html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <h2 style="color: #4f46e5; margin-top: 0;">AASTACLEAN Sovereign Dispatch</h2>
+            <div style="color: #334155; line-height: 1.6; font-size: 14px;">${body.replace(/\n/g, "<br/>")}</div>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;" />
+            <p style="font-size: 11px; color: #64748b;">This message was transmitted securely via self-hosted Postal enterprise mail servers.</p>
+          </div>`
+        });
+
+        logEntry.latencyMs = Date.now() - start;
+        logEntry.code = "250 OK Message accepted for delivery";
+      } catch (err: any) {
+        logEntry.status = "bounced";
+        logEntry.code = `SMTP Connection Error: ${err.message}`;
+        mPostalLogs.push(logEntry);
+        return res.status(500).json({
+          success: false,
+          error: "Sovereign Postal SMTP Transport Connection Refused",
+          message: err.message,
+          logEntry
+        });
+      }
+    } else {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      mPostalConfig.dailySent += 1;
+    }
+
+    mPostalLogs.push(logEntry);
+    
+    try {
+      await enqueueJob("dispatch_notice", {
+        bookingId: `postal_${Math.floor(Math.random() * 90000 + 10000)}`,
+        clientName: recipient.split("@")[0].toUpperCase() + " CORP",
+        email: recipient,
+        phone: "+61 400 000 000",
+        serviceName: `Postal Sovereign SMTP: ${subject}`,
+        totalAmount: 0
+      });
+    } catch (err) {
+      console.warn("⚠️ Could not auto-queue postal mail log job:", err);
+    }
+
+    return res.json({
+      success: true,
+      message: isMock ? "Simulated Sovereign Postal Mail Transmitted (Postmaster 250 OK)" : "Real SMTP Sovereign Email routed successfully",
+      logEntry
+    });
+  });
+
   // LocalStorage Migration Trigger
   app.post("/api/v1/payload/migrate", express.json(), (req, res) => {
     const { quotes } = req.body;

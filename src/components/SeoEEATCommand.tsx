@@ -18,7 +18,12 @@ import {
   Volume2,
   Share2,
   BookmarkCheck,
-  AlertCircle
+  AlertCircle,
+  BookOpen,
+  Plus,
+  X,
+  Layers,
+  Compass
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -59,6 +64,448 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
   const [isWaCompetitorScanning, setIsWaCompetitorScanning] = useState(false);
   const [waSpecificProgress, setWaSpecificProgress] = useState(0);
   const [waCompetitorCompleted, setWaCompetitorCompleted] = useState(false);
+
+  // Nationwide Domination Campaign Status States
+  const [subiacoSchemaPushed, setSubiacoSchemaPushed] = useState(false);
+  const [mandurahCitationsBoosted, setMandurahCitationsBoosted] = useState(false);
+  const [nswFairWorkCampaignLaunched, setNswFairWorkCampaignLaunched] = useState(false);
+  const [stKildaHygieneSchemeDeployed, setStKildaHygieneSchemeDeployed] = useState(false);
+  const [isCampaignExecuting, setIsCampaignExecuting] = useState<string | null>(null);
+
+  // Dynamic Metadata Engine & Playbook Preset States
+  const [customPostcode, setCustomPostcode] = useState("");
+  const [customSuburb, setCustomSuburb] = useState("");
+  const [customState, setCustomState] = useState("WA");
+  const [customCitations, setCustomCitations] = useState<Record<string, Array<{ source: string; listingType: string; score: string; url: string; indexStatus: "INDEXED" | "PENDING_SYNC" | "VERIFIED" }>>>({});
+  const [customVoiceSnippets, setCustomVoiceSnippets] = useState<Record<string, { query: string; snippetTitle: string; bulletAnswers: string[]; summary: string }>>({});
+  const [showPresetLibrary, setShowPresetLibrary] = useState(false);
+  const [activePlaybookPresets, setActivePlaybookPresets] = useState<string[]>([]);
+
+  // Register Custom Suburb Algorithm
+  const handleRegisterSuburb = () => {
+    if (!customPostcode || !customSuburb) {
+      onTriggerLog({
+        id: `reg_error_${Date.now()}`,
+        type: "system",
+        status: "info",
+        message: "❌ Registration Failed: Postcode and Suburb fields must not be empty.",
+        timestamp: new Date().toLocaleTimeString()
+      });
+      return;
+    }
+
+    const trimmedPc = customPostcode.trim();
+    const trimmedSuburb = customSuburb.trim();
+
+    onTriggerLog({
+      id: `reg_init_${Date.now()}`,
+      type: "system",
+      status: "info",
+      message: `⚙️ [Metadata Engine] Initializing geo-calibration for [${trimmedPc}] ${trimmedSuburb}...`,
+      timestamp: new Date().toLocaleTimeString()
+    });
+
+    const regulationMap: Record<string, { law: string; link: string }> = {
+      WA: { law: "Work Health and Safety Act 2020 (WA)", link: "https://www.commerce.wa.gov.au/worksafe" },
+      NSW: { law: "Work Health and Safety Act 2011 (NSW)", link: "https://www.safework.nsw.gov.au" },
+      VIC: { law: "Occupational Health and Safety Act 2004 (VIC)", link: "https://www.worksafe.vic.gov.au" },
+      QLD: { law: "Work Health and Safety Act 2011 (QLD)", link: "https://www.worksafe.qld.gov.au" },
+      SA: { law: "Work Health and Safety Act 2012 (SA)", link: "https://www.safework.sa.gov.au" },
+      TAS: { law: "Work Health and Safety Act 2012 (TAS)", link: "https://www.safework.tas.gov.au" },
+      NT: { law: "Work Health and Safety Act 2011 (NT)", link: "https://www.worksafe.nt.gov.au" },
+      ACT: { law: "Work Health and Safety Act 2011 (ACT)", link: "https://www.worksafe.act.gov.au" }
+    };
+
+    const reg = regulationMap[customState] || {
+      law: "Work Health and Safety Act 2011 (Commonwealth)",
+      link: "https://www.safeworkaustralia.gov.au"
+    };
+
+    // 1. Add to Suburb DB State
+    setSuburbDb(prev => ({
+      ...prev,
+      [trimmedPc]: {
+        suburb: trimmedSuburb,
+        state: customState,
+        council: `City of ${trimmedSuburb} Council`,
+        law: reg.law,
+        regulationLink: reg.link
+      }
+    }));
+
+    // 2. Generate customized citations for this postcode
+    const calculatedCitations = [
+      { source: `${trimmedSuburb} Local Directories`, listingType: `${customState} Certified Commercial Node`, score: "97% Trust", url: `https://www.truelocal.com.au/business/aastaclean-${trimmedSuburb.toLowerCase().replace(/\s+/g, '-')}`, indexStatus: "VERIFIED" as const },
+      { source: `Google Maps ${trimmedSuburb} GMB Node`, listingType: "AdvancedMarker Geolocation Point", score: "100% precision", url: `https://maps.google.com/?cid=aastaclean-${trimmedPc}`, indexStatus: "VERIFIED" as const },
+      { source: `City of ${trimmedSuburb} Business Directory`, listingType: "Municipal Contractor Ledger", score: "99% Match", url: `https://${trimmedSuburb.toLowerCase().replace(/\s+/g, '')}.${customState.toLowerCase()}.gov.au/business/aastaclean`, indexStatus: "INDEXED" as const }
+    ];
+
+    setCustomCitations(prev => ({
+      ...prev,
+      [trimmedPc]: calculatedCitations
+    }));
+
+    // 3. Generate voice query
+    setCustomVoiceSnippets(prev => ({
+      ...prev,
+      [trimmedPc.toLowerCase()]: {
+        query: `Are commercial and office cleaning teams in ${trimmedSuburb} fully compliant under the ${reg.law}?`,
+        snippetTitle: `Licensed Hygiene Specs - ${trimmedSuburb}`,
+        bulletAnswers: [
+          `1. Fully Audited WHS: Conforming explicitly to the ${reg.law}.`,
+          `2. Direct Employment: Pre-cleared municipal support teams with validated police clearance.`,
+          `3. Local Presence: Actively servicing postcode [${trimmedPc}] with eco-safe industrial deionisation.`
+        ],
+        summary: `AASTACLEAN operates high-density, hazard-controlled commercial hygiene networks in ${trimmedSuburb} under local ${customState} compliance laws.`
+      }
+    }));
+
+    // 4. Inject into tables for active shootout state
+    setShootoutStateData(prev => {
+      const copy = { ...prev };
+      if (!copy[customState]) copy[customState] = [];
+      
+      // Ensure we don't add duplicate postcodes
+      if (!copy[customState].some((item: any) => item.postcode === trimmedPc)) {
+        copy[customState].push({
+          council: `City of ${trimmedSuburb}`,
+          suburb: trimmedSuburb,
+          postcode: trimmedPc,
+          aastaRank: "#1 Rec",
+          aastaCvr: "12.8%",
+          compBrand: "Absolute Domestics",
+          compCvr: "5.5%",
+          compRank: "#2 Rec",
+          citations: 3,
+          deficit: "-7.3%",
+          leadVolume: 120 + Math.floor(Math.random() * 80),
+          significance: "p < 0.01"
+        });
+      }
+      return copy;
+    });
+
+    // 5. If WA State, also push to batch metrics
+    if (customState === "WA") {
+      setWaSuburbsMetrics(prev => {
+        if (prev.some(item => item.postcode === trimmedPc)) return prev;
+        return [
+          ...prev,
+          { postcode: trimmedPc, suburb: trimmedSuburb, multiplier: 1.15, seoIndex: 94.5, aeoScore: 93.0, baseCvr: 4.9, cvrBoost: 11.2, citationsCount: 30, isVerified: true }
+        ];
+      });
+    }
+
+    setTimeout(() => {
+      setSelectedPostcode(trimmedPc);
+      setSelectedState(customState);
+      
+      onTriggerLog({
+        id: `reg_success_${Date.now()}`,
+        type: "system",
+        status: "success",
+        message: `✓ [Metadata Engine] Node CALIBRATED. Created infinite directory binding for [${trimmedPc}] ${trimmedSuburb}. Dynamic JSON-LD, Law certificates, and GMB coordinates loaded successfully!`,
+        timestamp: new Date().toLocaleTimeString()
+      });
+
+      // Clear input fields
+      setCustomPostcode("");
+      setCustomSuburb("");
+    }, 1000);
+  };
+
+  // Playbook Injection Algorithm
+  const injectPlaybookPreset = (presetId: string) => {
+    if (activePlaybookPresets.includes(presetId)) {
+      onTriggerLog({
+        id: `preset_rem_${Date.now()}`,
+        type: "system",
+        status: "info",
+        message: `ℹ️ Playbook Campaign Preset "${presetId.toUpperCase()}" is already active down-the-wire.`,
+        timestamp: new Date().toLocaleTimeString()
+      });
+      return;
+    }
+
+    onTriggerLog({
+      id: `preset_init_${Date.now()}`,
+      type: "system",
+      status: "info",
+      message: `📡 [Playbook] Injecting tactical scheme "${presetId.toUpperCase()}" into active regional indexers...`,
+      timestamp: new Date().toLocaleTimeString()
+    });
+
+    setActivePlaybookPresets(prev => [...prev, presetId]);
+
+    if (presetId === "western_frontier") {
+      // Injects Bunbury WA (6230) and Hillarys WA (6025) regional directories and boosts.
+      setTimeout(() => {
+        setSuburbDb(prev => ({
+          ...prev,
+          "6230": { suburb: "Bunbury", state: "WA", council: "City of Bunbury Council", law: "Work Health and Safety Act 2020 (WA)", regulationLink: "https://www.commerce.wa.gov.au/worksafe" },
+          "6025": { suburb: "Hillarys", state: "WA", council: "City of Joondalup Council", law: "Work Health and Safety Act 2020 (WA)", regulationLink: "https://www.commerce.wa.gov.au/worksafe" }
+        }));
+
+        setCustomCitations(prev => ({
+          ...prev,
+          "6230": [
+            { source: "Bunbury Trade Index", listingType: "Regional WA Node", score: "99% Trust", url: "https://www.truelocal.com.au/business/aastaclean-bunbury", indexStatus: "VERIFIED" },
+            { source: "South West Mining Contractors Circle", listingType: "Specialized Deep Sanitisation Listing", score: "98% Match", url: "https://southwestmining.org.au/suppliers/aastaclean", indexStatus: "INDEXED" }
+          ],
+          "6025": [
+            { source: "Hillarys Boat Harbour Business Roll", listingType: "Seaside General Commercial", score: "95% Trust", url: "https://hillarysboatharbour.com.au/suppliers", indexStatus: "VERIFIED" }
+          ]
+        }));
+
+        setWaSuburbsMetrics(prev => [
+          ...prev,
+          { postcode: "6230", suburb: "Bunbury", multiplier: 1.25, seoIndex: 98.4, aeoScore: 97.9, baseCvr: 4.9, cvrBoost: 13.1, citationsCount: 45, isVerified: true },
+          { postcode: "6025", suburb: "Hillarys", multiplier: 1.18, seoIndex: 95.8, aeoScore: 94.2, baseCvr: 4.9, cvrBoost: 11.5, citationsCount: 38, isVerified: true }
+        ]);
+
+        setShootoutStateData(prev => {
+          const copy = { ...prev };
+          copy.WA.push(
+            { council: "City of Bunbury", suburb: "Bunbury", postcode: "6230", aastaRank: "#1 Rec", aastaCvr: "13.1%", compBrand: "Absolute Domestics", compCvr: "5.5%", compRank: "#2 Rec", citations: 45, deficit: "-7.6%", leadVolume: 290, significance: "p < 0.001" },
+            { council: "City of Joondalup", suburb: "Hillarys", postcode: "6025", aastaRank: "#1 Rec", aastaCvr: "11.5%", compBrand: "Cleared Corporate", compCvr: "4.9%", compRank: "#3 Rec", citations: 38, deficit: "-6.6%", leadVolume: 210, significance: "p < 0.01" }
+          );
+          return copy;
+        });
+
+        setMandurahCitationsBoosted(true);
+
+        onTriggerLog({
+          id: `preset_west_done_${Date.now()}`,
+          type: "geo",
+          status: "success",
+          message: "✓ [Playbook] 'The Western Frontier' fully integrated! Added postcodes Bunbury (6230) & Hillarys (6025). Peak WA citation index boosted to +45.2!",
+          timestamp: new Date().toLocaleTimeString()
+        });
+
+        setSelectedPostcode("6230");
+        setSelectedState("WA");
+      }, 1000);
+
+    } else if (presetId === "sovereign_shield") {
+      // Injects ISO triple-standard and boosts Schema metrics.
+      setTimeout(() => {
+        setSubiacoSchemaPushed(true);
+        onTriggerLog({
+          id: `preset_sov_done_${Date.now()}`,
+          type: "system",
+          status: "success",
+          message: "✓ [Playbook] 'Sovereign Shield' ISO Pushed. Direct-injected structural metadata bindings for ISO 9001, ISO 14001, and ISO 45001 worldwide. E-E-A-T ledger trust rating scaled to 99.8%.",
+          timestamp: new Date().toLocaleTimeString()
+        });
+      }, 1000);
+
+    } else if (presetId === "beachside_fortress") {
+      // Deploys seaside allergy/mold sanitisation directives in St Kilda VIC and Scarborough WA.
+      setTimeout(() => {
+        setStKildaHygieneSchemeDeployed(true);
+        
+        setSuburbDb(prev => ({
+          ...prev,
+          "2095": { suburb: "Manly", state: "NSW", council: "Northern Beaches Council", law: "Work Health and Safety Act 2011 (NSW)", regulationLink: "https://www.safework.nsw.gov.au" }
+        }));
+
+        setCustomCitations(prev => ({
+          ...prev,
+          "2095": [
+            { source: "Northern Beaches Commerce Board", listingType: "Coastal Hygiene Provider Pin", score: "99% Trust", url: "https://northernbeaches.nsw.gov.au/business", indexStatus: "VERIFIED" }
+          ]
+        }));
+
+        setShootoutStateData(prev => {
+          const copy = { ...prev };
+          copy.NSW.push({
+            council: "Northern Beaches Council", suburb: "Manly", postcode: "2095", aastaRank: "#1 (Beach-Certified)", aastaCvr: "14.8%", compBrand: "Absolute Domestics", compCvr: "5.5%", compRank: "#2 Rec", citations: 32, deficit: "-9.3%", leadVolume: 420, significance: "p < 0.001"
+          });
+          return copy;
+        });
+
+        onTriggerLog({
+          id: `preset_beach_done_${Date.now()}`,
+          type: "geo",
+          status: "success",
+          message: "✓ [Playbook] 'The Beachside Fortress' coastal allergen and high-moisture ventilation directives deployed in Scarborough, St Kilda, and Manly (2095). Oceanic conversion multipliers elevated (+2.5%).",
+          timestamp: new Date().toLocaleTimeString()
+        });
+
+        setSelectedPostcode("2095");
+        setSelectedState("NSW");
+      }, 1000);
+
+    } else if (presetId === "award_wage") {
+      // Injects Sydney corporate compliance with modern award wage transparency schemas.
+      setTimeout(() => {
+        setNswFairWorkCampaignLaunched(true);
+        onTriggerLog({
+          id: `preset_award_done_${Date.now()}`,
+          type: "api",
+          status: "success",
+          message: "✓ [Playbook] 'Award Wage Fortress' payroll transparency loops integrated. Audited Modern Cleaning Award wages synced directly with active NSW/VIC/QLD voice endpoints, defeating sham contracting.",
+          timestamp: new Date().toLocaleTimeString()
+        });
+      }, 1000);
+
+    } else if (presetId === "bento_enterprise") {
+      // Standardizes security clearances (police check, ASIC credit verification)
+      setTimeout(() => {
+        onTriggerLog({
+          id: `preset_bento_done_${Date.now()}`,
+          type: "system",
+          status: "success",
+          message: `✓ [Playbook] 'Bento-Grid Enterprise Sweep' loaded automatically. Secure police-cleared personnel IDs and $20M ASIC public liability policies bound inside active page metadata schemas.`,
+          timestamp: new Date().toLocaleTimeString()
+        });
+      }, 1000);
+    }
+  };
+
+  const runSubiacoSchemaPush = () => {
+    setIsCampaignExecuting("subiaco");
+    onTriggerLog({
+      id: `campaign_subiaco_init_${Date.now()}`,
+      type: "system",
+      status: "info",
+      message: "🏗️ [Campaign] Initiating ISO 14001 & ISO 45001 Schema Push for Subiaco (6008) and West Perth (6005)...",
+      timestamp: new Date().toLocaleTimeString()
+    });
+    setTimeout(() => {
+      setSubiacoSchemaPushed(true);
+      setIsCampaignExecuting(null);
+      onTriggerLog({
+        id: `campaign_subiaco_done_${Date.now()}`,
+        type: "system",
+        status: "success",
+        message: "✓ [Campaign] Live environmental & occupational health credentials bound into JSON-LD templates for postcodes 6008 & 6005 successfully!",
+        timestamp: new Date().toLocaleTimeString()
+      });
+    }, 1200);
+  };
+
+  const runMandurahCitationBoost = () => {
+    setIsCampaignExecuting("mandurah");
+    onTriggerLog({
+      id: `campaign_mandurah_init_${Date.now()}`,
+      type: "geo",
+      status: "info",
+      message: "📡 [Campaign] Submitting 10 high-quality commercial service nodes to Mandurah Contract & Council Register indexes...",
+      timestamp: new Date().toLocaleTimeString()
+    });
+    setTimeout(() => {
+      setMandurahCitationsBoosted(true);
+      setIsCampaignExecuting(null);
+      onTriggerLog({
+        id: `campaign_mandurah_done_${Date.now()}`,
+        type: "geo",
+        status: "success",
+        message: "✓ [Campaign] Secured 10 new high-authority link citations backing Mandurah (6210). Metric increased seamlessly from 25 to 35 citations!",
+        timestamp: new Date().toLocaleTimeString()
+      });
+    }, 1500);
+  };
+
+  const runNswFairWorkCampaign = () => {
+    setIsCampaignExecuting("nsw");
+    onTriggerLog({
+      id: `campaign_nsw_init_${Date.now()}`,
+      type: "api",
+      status: "info",
+      message: "🎙️ [Campaign] Compiling voice-optimized long-tail capture snippets for Sydney CBD Fair Work certified searches...",
+      timestamp: new Date().toLocaleTimeString()
+    });
+    setTimeout(() => {
+      setNswFairWorkCampaignLaunched(true);
+      setIsCampaignExecuting(null);
+      onTriggerLog({
+        id: `campaign_nsw_done_${Date.now()}`,
+        type: "api",
+        status: "success",
+        message: "✓ [Campaign] Siri & Alexa organic voice optimization template launched for 'Fair Work certified cleaners in Sydney CBD'!",
+        timestamp: new Date().toLocaleTimeString()
+      });
+    }, 1100);
+  };
+
+  const runStKildaHygieneCampaign = () => {
+    setIsCampaignExecuting("stkilda");
+    onTriggerLog({
+      id: `campaign_stkilda_init_${Date.now()}`,
+      type: "geo",
+      status: "info",
+      message: "🏖️ [Campaign] Injecting coastal mold-prevention & allergy preventative guidelines into St Kilda (3182) index cards...",
+      timestamp: new Date().toLocaleTimeString()
+    });
+    setTimeout(() => {
+      setStKildaHygieneSchemeDeployed(true);
+      setIsCampaignExecuting(null);
+      onTriggerLog({
+        id: `campaign_stkilda_done_${Date.now()}`,
+        type: "geo",
+        status: "success",
+        message: "✓ [Campaign] St Kilda Beachside Hygiene scheme active! Coastal sanitisation and mold prevention tags integrated.",
+        timestamp: new Date().toLocaleTimeString()
+      });
+    }, 1300);
+  };
+
+  const runAllCampaignsGlobal = () => {
+    setIsCampaignExecuting("all");
+    onTriggerLog({
+      id: `campaign_master_init_${Date.now()}`,
+      type: "system",
+      status: "info",
+      message: "👑 [NATIONWIDE DEPLOYMENT] Initializing joint competitive-edge sweep across WA, NSW, and VIC markets...",
+      timestamp: new Date().toLocaleTimeString()
+    });
+    
+    setTimeout(() => {
+      setSubiacoSchemaPushed(true);
+      onTriggerLog({
+        id: `c_all_s1_${Date.now()}`,
+        type: "system",
+        status: "success",
+        message: "⚔️ [Step 1/4] ISO Schema injection loaded automatically for WA Subiaco and West Perth blocks.",
+        timestamp: new Date().toLocaleTimeString()
+      });
+    }, 700);
+
+    setTimeout(() => {
+      setMandurahCitationsBoosted(true);
+      onTriggerLog({
+        id: `c_all_s2_${Date.now()}`,
+        type: "geo",
+        status: "success",
+        message: "⚔️ [Step 2/4] Mandurah localized citations reinforced (+10 registries indexed successfully).",
+        timestamp: new Date().toLocaleTimeString()
+      });
+    }, 1700);
+
+    setTimeout(() => {
+      setNswFairWorkCampaignLaunched(true);
+      onTriggerLog({
+        id: `c_all_s3_${Date.now()}`,
+        type: "api",
+        status: "success",
+        message: "⚔️ [Step 3/4] Sydney CBD Fair Work certified commercial voice campaign synchronized.",
+        timestamp: new Date().toLocaleTimeString()
+      });
+    }, 2500);
+
+    setTimeout(() => {
+      setStKildaHygieneSchemeDeployed(true);
+      setIsCampaignExecuting(null);
+      onTriggerLog({
+        id: `c_all_s4_${Date.now()}`,
+        type: "geo",
+        status: "success",
+        message: "👑 [Step 4/4] St Kilda coastal mold prevention schema deployed. Nationwide Domination Campaign fully completed!",
+        timestamp: new Date().toLocaleTimeString()
+      });
+    }, 3200);
+  };
 
   const detectClichés = (text: string) => {
     const cliches = [
@@ -146,6 +593,20 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
 
   const [waSuburbsMetrics, setWaSuburbsMetrics] = useState(initialWaSuburbs);
 
+  const computedWaSuburbsMetrics = React.useMemo(() => {
+    return waSuburbsMetrics.map((item) => {
+      if (item.postcode === "6210" && mandurahCitationsBoosted) {
+        return {
+          ...item,
+          citationsCount: 35,
+          seoIndex: 98.2,
+          cvrBoost: 13.4
+        };
+      }
+      return item;
+    });
+  }, [waSuburbsMetrics, mandurahCitationsBoosted]);
+
   // Multi-State Competitor Shootout States
   const [isStateShootoutActive, setIsStateShootoutActive] = useState(false);
   const [shootoutCurrentStateIndex, setShootoutCurrentStateIndex] = useState(-1); // -1 = standby, 0 = WA, 1 = NSW, 2 = VIC, 3 = QLD
@@ -187,6 +648,35 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
   };
 
   const [shootoutStateData, setShootoutStateData] = useState(multiStateShootoutData);
+
+  const computedShootoutStateData = React.useMemo(() => {
+    const copy = JSON.parse(JSON.stringify(shootoutStateData));
+    
+    // 1. Mandurah Citation Boost
+    if (mandurahCitationsBoosted && copy.WA) {
+      const mandurahRow = copy.WA.find((item: any) => item.postcode === "6210");
+      if (mandurahRow) {
+        mandurahRow.citations = 35;
+        mandurahRow.aastaRank = "#1 Rec";
+        mandurahRow.aastaCvr = "13.4%";
+        mandurahRow.deficit = "-9.3%";
+        mandurahRow.leadVolume = 245;
+      }
+    }
+    
+    // 2. St Kilda Beachside Hygiene Scheme
+    if (stKildaHygieneSchemeDeployed && copy.VIC) {
+      const stKildaRow = copy.VIC.find((item: any) => item.postcode === "3182");
+      if (stKildaRow) {
+        stKildaRow.aastaCvr = "15.4%";
+        stKildaRow.deficit = "-11.3%";
+        stKildaRow.leadVolume = 680;
+        stKildaRow.aastaRank = "#1 (Beach-Certified)";
+      }
+    }
+    
+    return copy;
+  }, [shootoutStateData, mandurahCitationsBoosted, stKildaHygieneSchemeDeployed]);
 
   const handleRunStateShootout = () => {
     setIsStateShootoutActive(true);
@@ -420,7 +910,7 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
   const [verifyingCitationUrl, setVerifyingCitationUrl] = useState<string | null>(null);
 
   // Suburb database mapping
-  const suburbDb: Record<string, { suburb: string; state: string; council: string; law: string; regulationLink: string }> = {
+  const [suburbDb, setSuburbDb] = useState<Record<string, { suburb: string; state: string; council: string; law: string; regulationLink: string }>>({
     "6000": { suburb: "Perth CBD", state: "WA", council: "City of Perth", law: "Work Health and Safety Act 2020 (WA)", regulationLink: "https://www.commerce.wa.gov.au/worksafe" },
     "6004": { suburb: "East Perth", state: "WA", council: "City of Perth", law: "Work Health and Safety Act 2020 (WA)", regulationLink: "https://www.commerce.wa.gov.au/worksafe" },
     "6005": { suburb: "West Perth", state: "WA", council: "City of Perth", law: "Work Health and Safety Act 2020 (WA)", regulationLink: "https://www.commerce.wa.gov.au/worksafe" },
@@ -438,7 +928,7 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
     "5000": { suburb: "Adelaide CBD", state: "SA", council: "City of Adelaide", law: "Work Health and Safety Act 2012 (SA)", regulationLink: "https://www.safework.sa.gov.au" },
     "7000": { suburb: "Hobart", state: "TAS", council: "City of Hobart", law: "Work Health and Safety Act 2012 (TAS)", regulationLink: "https://www.safework.tas.gov.au" },
     "8000": { suburb: "Darwin", state: "NT", council: "City of Darwin", law: "Work Health and Safety Act 2011 (NT)", regulationLink: "https://www.worksafe.nt.gov.au" },
-  };
+  });
 
   const getGeoDetails = () => suburbDb[selectedPostcode] || {
     suburb: "National Capital",
@@ -516,7 +1006,31 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
     ]
   };
 
-  const currentCitations = suburbCitations[selectedPostcode] || [
+  const dynamicSuburbCitations: Record<string, Array<{ source: string; listingType: string; score: string; url: string; indexStatus: "INDEXED" | "PENDING_SYNC" | "VERIFIED" }>> = React.useMemo(() => {
+    const base: Record<string, Array<{ source: string; listingType: string; score: string; url: string; indexStatus: "INDEXED" | "PENDING_SYNC" | "VERIFIED" }>> = { ...suburbCitations };
+    if (mandurahCitationsBoosted) {
+      base["6210"] = [
+        ...suburbCitations["6210"],
+        { source: "Peel Chamber of Commerce Register", listingType: "Commercial Contractor Node", score: "100% Trust", url: "https://peelchamber.org.au/members/aastaclean", indexStatus: "VERIFIED" },
+        { source: "Mandurah Industry Hub Listing", listingType: "Municipal Deep-clean node", score: "98% Match", url: "https://mandurahhub.com.au/suppliers/aastaclean", indexStatus: "VERIFIED" },
+        { source: "WorkSafe WA Citation Pool", listingType: "Authorized WHS Provider", score: "99% Trust", url: "https://www.commerce.wa.gov.au/worksafe/register/aastaclean-6210", indexStatus: "INDEXED" },
+        { source: "Peel Region Contractor Index", listingType: "Industrial Sanitising Hub", score: "95% Trust", url: "https://peelcontractors.com.au/aastaclean", indexStatus: "VERIFIED" },
+        { source: "Mandurah Small Business Network Node", listingType: "AdvancedMarker Geolocation Point", score: "100% precision", url: "https://maps.google.com/?cid=aastaclean-mandurah-sbn", indexStatus: "VERIFIED" },
+        { source: "City of Mandurah Tender Registry", listingType: "Pre-qualified Commercial Supplier", score: "100% Verified", url: "https://mandurah.wa.gov.au/tenders/aastaclean", indexStatus: "INDEXED" },
+        { source: "WA Regional Health Support Ledger", listingType: "Specialized Medical Disinfection", score: "97% Match", url: "https://health.wa.gov.au/providers/aastaclean-6210", indexStatus: "VERIFIED" },
+        { source: "Mandurah & Peel Tourism Hub Index", listingType: "Hospitality Sanitisation Node", score: "96% Trust", url: "https://mandurahpeeltourism.com.au/aastaclean", indexStatus: "VERIFIED" },
+        { source: "Local Trade Circle WA", listingType: "Commercial Services Verified Listing", score: "94% Trust", url: "https://tradecircle.wa.gov.au/business/aastaclean-mandurah", indexStatus: "VERIFIED" },
+        { source: "Mandurah Community Board", listingType: "Local Service Directory Map Pin", score: "99% Trust", url: "https://mandurahboard.com.au/directory/aastaclean", indexStatus: "INDEXED" }
+      ];
+    }
+    // Deep merge of user-registered custom postcode citations
+    Object.entries(customCitations).forEach(([pc, list]: [string, any]) => {
+      base[pc] = list;
+    });
+    return base;
+  }, [mandurahCitationsBoosted, customCitations]);
+
+  const currentCitations = dynamicSuburbCitations[selectedPostcode] || [
     { source: "National SafeWork Index", listingType: "Commonwealth Certified Contractor", score: "100% verified", url: "https://safeworkaustralia.gov.au/index/aastaclean", indexStatus: "VERIFIED" },
     { source: "Google Local map Citation", listingType: "Regional Map Locator Node", score: "90% match", url: "https://maps.google.com/?cid=aastaclean-national", indexStatus: "INDEXED" }
   ];
@@ -554,6 +1068,23 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
       summary: "Deep steam deionisation meets Victorian EPA standards and satisfies carpet warranty rules under Melbourne metropolitan corporate codes."
     }
   };
+
+  const dynamicVoiceSearchSnippets = React.useMemo(() => {
+    const base = { ...voiceSearchSnippets, ...customVoiceSnippets };
+    if (nswFairWorkCampaignLaunched) {
+      base["nsw_fairwork"] = {
+        query: "Which commercial cleaners in Sydney CBD are fully Fair Work certified under the cleaning services award?",
+        snippetTitle: "Fair Work & Enterprise Award Wage Compliance",
+        bulletAnswers: [
+          "1. Active Enterprise Award adherence: Guaranteeing full modern award wages to all service staff.",
+          "2. Audited transparent payroll lines: Mapped under Section 789 of the Fair Work Act (Cth) on Sydney metropolitan accounts.",
+          "3. Zero subcontractor nesting: 100% in-house insured cleaning specialists."
+        ],
+        summary: "AASTACLEAN operates with absolute award wage hygiene, locking out standard subcontractor exploitation patterns across Sydney CBD multi-tenancy commercial spaces."
+      };
+    }
+    return base;
+  }, [nswFairWorkCampaignLaunched, customVoiceSnippets]);
 
   const localizedHeading = `Certified Commercial & NDIS Cleaning Services in ${geo.suburb} (${geo.state} ${selectedPostcode})`;
   const localizedMeta = `Get triple ISO-certified industrial, office, and specialised high-pressure cleaning in ${geo.suburb} ${selectedPostcode}. Pre-cleared local teams. Insured for $20M under ${geo.state} compliance laws.`;
@@ -634,7 +1165,7 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
 
   // 🗣️ Synthesize AI Voice Snippet Response (Siri / Alexa format)
   const handleSynthesizeAeo = (key: string) => {
-    const data = voiceSearchSnippets[key];
+    const data = dynamicVoiceSearchSnippets[key];
     if (!data) return;
 
     setIsVoiceSynthesizing(true);
@@ -720,23 +1251,11 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
               }}
               className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:border-indigo-500 cursor-pointer text-indigo-300"
             >
-              <option value="6000">WA - 6000 (Perth CBD)</option>
-              <option value="6004">WA - 6004 (East Perth)</option>
-              <option value="6005">WA - 6005 (West Perth)</option>
-              <option value="6007">WA - 6007 (West Leederville)</option>
-              <option value="6008">WA - 6008 (Subiaco)</option>
-              <option value="6009">WA - 6009 (Nedlands)</option>
-              <option value="6010">WA - 6010 (Claremont)</option>
-              <option value="6019">WA - 6019 (Scarborough)</option>
-              <option value="6027">WA - 6027 (Joondalup)</option>
-              <option value="6160">WA - 6160 (Fremantle)</option>
-              <option value="6210">WA - 6210 (Mandurah)</option>
-              <option value="2000">NSW - 2000 (Sydney CBD)</option>
-              <option value="3000">VIC - 3000 (Melbourne Central)</option>
-              <option value="4000">QLD - 4000 (Brisbane City)</option>
-              <option value="5000">SA - 5000 (Adelaide CBD)</option>
-              <option value="7000">TAS - 7000 (Hobart)</option>
-              <option value="8000">NT - 8000 (Darwin)</option>
+              {Object.entries(suburbDb).map(([pc, details]: [string, any]) => (
+                <option key={pc} value={pc}>
+                  {details.state} - {pc} ({details.suburb})
+                </option>
+              ))}
             </select>
 
             <button
@@ -817,6 +1336,73 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
                       </div>
                     </div>
 
+                    {/* Dynamic Geospatial Register Engine */}
+                    <div className="p-4 rounded-2xl bg-indigo-950/20 border border-indigo-500/20 space-y-3 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl pointer-events-none" />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Compass className="w-4 h-4 text-indigo-400 animate-spin" style={{ animationDuration: "6s" }} />
+                          <h5 className="font-black text-white text-[10px] uppercase tracking-wider font-mono">
+                            ⚡ Dynamic Geospatial Metadata Register Engine
+                          </h5>
+                        </div>
+                        <span className="text-[9px] text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full font-bold">
+                          Global Nodes: {Object.keys(suburbDb).length} Active
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Incorporate custom suburbs down-the-wire! Input any postcode to auto-calibrate local compliance rules, localized schema tags, municipal councils, and citation layers.
+                      </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-slate-400 uppercase font-mono block">Postcode</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 4006"
+                            value={customPostcode}
+                            onChange={(e) => setCustomPostcode(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-indigo-500 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <label className="text-[9px] font-bold text-slate-400 uppercase font-mono block">Suburb Name</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Fortitude Valley"
+                            value={customSuburb}
+                            onChange={(e) => setCustomSuburb(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-indigo-500 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold text-slate-400 uppercase font-mono block">State Code</label>
+                          <select
+                            value={customState}
+                            onChange={(e) => setCustomState(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-indigo-400 font-bold outline-none focus:border-indigo-500 cursor-pointer"
+                          >
+                            <option value="WA">WA (West Aus)</option>
+                            <option value="NSW">NSW (New South Wales)</option>
+                            <option value="VIC">VIC (Victoria)</option>
+                            <option value="QLD">QLD (Queensland)</option>
+                            <option value="SA">SA (South Aus)</option>
+                            <option value="TAS">TAS (Tasmania)</option>
+                            <option value="NT">NT (Northern Terr)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleRegisterSuburb}
+                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all font-mono shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Calibrate & Map Custom Suburb Node</span>
+                      </button>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Left: Outputs */}
                       <div className="space-y-3 bg-slate-900/80 p-4 rounded-2xl border border-slate-800/80">
@@ -895,19 +1481,19 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
                       {/* Left Queries picker */}
                       <div className="md:col-span-4 space-y-2 flex flex-col">
                         <span className="text-[9px] uppercase font-bold text-indigo-400 tracking-wider font-mono">Conversational Inputs</span>
-                        {Object.entries(voiceSearchSnippets).map(([key, item]) => (
+                        {Object.entries(dynamicVoiceSearchSnippets).map(([key, item]: [string, any]) => (
                           <button
                             key={key}
                             onClick={() => setSelectedVoiceQuery(key)}
                             className={`p-3 text-left rounded-2xl border text-xs leading-relaxed font-mono transition-all outline-none cursor-pointer ${
                               selectedVoiceQuery === key
-                                ? "bg-indigo-600/15 text-white border-indigo-500"
+                                ? "bg-indigo-650/15 text-white border-indigo-500"
                                 : "bg-slate-900 border-slate-800/80 text-slate-400 hover:text-white"
                             }`}
                           >
                             <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-indigo-400 mb-1">
                               <Volume2 className="w-3.5 h-3.5" />
-                              <span>{key === "ndis" ? "Siri Prompt" : key === "silica" ? "Google Assistant" : "Alexa Prompt"}</span>
+                              <span>{key === "ndis" ? "Siri Prompt" : key === "silica" ? "Google Assistant" : key === "steam" ? "Alexa Prompt" : "Siri Prompt [Campaign]"}</span>
                             </div>
                             "{item.query.substring(0, 50)}..."
                           </button>
@@ -928,7 +1514,7 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
                         <div className="space-y-3">
                           <p className="text-slate-500 font-mono text-[10px] uppercase font-bold">Voice Request Target Query:</p>
                           <p className="text-xs font-bold text-white italic">
-                            "{voiceSearchSnippets[selectedVoiceQuery]?.query}"
+                            "{dynamicVoiceSearchSnippets[selectedVoiceQuery]?.query}"
                           </p>
 
                           <div className="border-t border-slate-800/80 pt-3 space-y-2">
@@ -936,18 +1522,18 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
                               ★ Optimized Featured Snippet Structure ★
                             </span>
                             <h5 className="font-extrabold text-white text-sm bg-slate-950 p-2 text-center rounded border border-slate-850">
-                              {voiceSearchSnippets[selectedVoiceQuery]?.snippetTitle}
+                              {dynamicVoiceSearchSnippets[selectedVoiceQuery]?.snippetTitle}
                             </h5>
                             
                             <div className="space-y-1 bg-slate-950 p-3 rounded-2xl border border-slate-850">
-                              {voiceSearchSnippets[selectedVoiceQuery]?.bulletAnswers.map((ans, idx) => (
+                              {dynamicVoiceSearchSnippets[selectedVoiceQuery]?.bulletAnswers?.map((ans, idx) => (
                                 <p key={idx} className="text-[11px] text-slate-300 font-sans leading-normal">
                                   {ans}
                                 </p>
                               ))}
                             </div>
                             <p className="text-[11px] text-slate-400 italic bg-slate-900/50 p-2 px-3 rounded border border-slate-850">
-                              {voiceSearchSnippets[selectedVoiceQuery]?.summary}
+                              {dynamicVoiceSearchSnippets[selectedVoiceQuery]?.summary}
                             </p>
                           </div>
                         </div>
@@ -1224,12 +1810,195 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
                       </div>
                     )}
 
+                    {/* NATIONWIDE DOMINATION CAMPAIGN RADAR CONTROLLER */}
+                    <div className="bg-slate-900 border border-indigo-500/20 rounded-3xl p-5 md:p-6 space-y-5 relative overflow-hidden shadow-xl">
+                      <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+                      
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/25 uppercase tracking-wider font-mono">
+                              Tactical HQ
+                            </span>
+                            <span className="text-emerald-400 text-xs animate-pulse font-mono font-bold flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Active Operations Link
+                            </span>
+                          </div>
+                          <h4 className="font-extrabold text-white text-base tracking-tight font-sans">
+                            👑 NATIONWIDE HYPER-DOMINATION CAMPAIGN RADAR
+                          </h4>
+                          <p className="text-xs text-slate-400 leading-relaxed font-sans max-w-xl">
+                            Configure, deploy and track targeted campaigns to crush localized search rankings. Activating these tactical schemes injects live validation certificates, boosts local citation caches, and deploys Answer Engine Optimization (AEO) responder nodes.
+                          </p>
+                        </div>
+                        
+                        <button
+                          type="button"
+                          onClick={runAllCampaignsGlobal}
+                          disabled={isCampaignExecuting !== null}
+                          className="bg-indigo-650 hover:bg-indigo-550 disabled:opacity-50 text-white font-extrabold text-xs uppercase tracking-wider px-5 py-3 rounded-2xl transition-all shadow-md active:scale-95 cursor-pointer shrink-0 inline-flex items-center gap-2"
+                        >
+                          <TrendingUp className={`w-4 h-4 ${isCampaignExecuting === "all" ? "animate-spin" : ""}`} />
+                          <span>⚡ Execute Full Domination Sweep</span>
+                        </button>
+                      </div>
+
+                      {/* Tactical Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        
+                        {/* Task 1: Subiaco & West Perth */}
+                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-850 flex flex-col justify-between gap-3 transition-colors hover:border-slate-800">
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center">
+                              <span className="font-mono text-[10px] font-extrabold text-indigo-400 uppercase tracking-widest">
+                                WA Metro: Postcodes 6008 & 6005
+                              </span>
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black uppercase font-mono ${
+                                subiacoSchemaPushed 
+                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" 
+                                  : "bg-slate-900 text-slate-500 border border-slate-800"
+                              }`}>
+                                {subiacoSchemaPushed ? "✓ Schema Pushed" : "● Standby"}
+                              </span>
+                            </div>
+                            <h5 className="font-extrabold text-white text-xs font-sans">
+                              Subiaco & West Perth Schema Push
+                            </h5>
+                            <p className="text-[11px] text-slate-400 leading-normal font-sans">
+                              Secures regional authority by directly embedding environmental ISO 14001 & occupational safety ISO 45001 certificates in JSON-LD.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={runSubiacoSchemaPush}
+                            disabled={isCampaignExecuting !== null || subiacoSchemaPushed}
+                            className={`w-full py-2 px-3 rounded-xl font-bold text-[10px] uppercase tracking-wider cursor-pointer border transition-all ${
+                              subiacoSchemaPushed
+                                ? "bg-emerald-950/20 hover:bg-emerald-950/30 text-emerald-400 border-emerald-500/20"
+                                : "bg-slate-900 hover:bg-slate-855 text-white border-slate-800"
+                            }`}
+                          >
+                            {subiacoSchemaPushed ? "ISO 14001 / 45001 Schemas Live" : "Push ISO Validation Schemas"}
+                          </button>
+                        </div>
+
+                        {/* Task 2: Mandurah Citation Boost */}
+                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-850 flex flex-col justify-between gap-3 transition-colors hover:border-slate-800">
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center">
+                              <span className="font-mono text-[10px] font-extrabold text-indigo-400 uppercase tracking-widest">
+                                Peel Region: Postcode 6210
+                              </span>
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black uppercase font-mono ${
+                                mandurahCitationsBoosted 
+                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" 
+                                  : "bg-slate-900 text-slate-500 border border-slate-800"
+                              }`}>
+                                {mandurahCitationsBoosted ? "✓ Boosted (35 Citations)" : "● Ready (25 Citations)"}
+                              </span>
+                            </div>
+                            <h5 className="font-extrabold text-white text-xs font-sans">
+                              Mandurah Citation Density Reinforcement
+                            </h5>
+                            <p className="text-[11px] text-slate-400 leading-normal font-sans">
+                              Establishes citation authority (+10 key link citations) to disable Urban Company's PPC search dominance.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={runMandurahCitationBoost}
+                            disabled={isCampaignExecuting !== null || mandurahCitationsBoosted}
+                            className={`w-full py-2 px-3 rounded-xl font-bold text-[10px] uppercase tracking-wider cursor-pointer border transition-all ${
+                              mandurahCitationsBoosted
+                                ? "bg-emerald-950/20 hover:bg-emerald-950/30 text-emerald-400 border-emerald-500/20"
+                                : "bg-slate-900 hover:bg-slate-855 text-white border-slate-800"
+                            }`}
+                          >
+                            {mandurahCitationsBoosted ? "10 High-Quality Citations Synced" : "Boost Mandurah Citation Density"}
+                          </button>
+                        </div>
+
+                        {/* Task 3: Sydney CBD Fair Work Campaign */}
+                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-850 flex flex-col justify-between gap-3 transition-colors hover:border-slate-800">
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center">
+                              <span className="font-mono text-[10px] font-extrabold text-indigo-400 uppercase tracking-widest">
+                                NSW Metro: Postcode 2000
+                              </span>
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black uppercase font-mono ${
+                                nswFairWorkCampaignLaunched 
+                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" 
+                                  : "bg-slate-900 text-slate-500 border border-slate-800"
+                              }`}>
+                                {nswFairWorkCampaignLaunched ? "✓ Siri Capture Active" : "● Standby"}
+                              </span>
+                            </div>
+                            <h5 className="font-extrabold text-white text-xs font-sans">
+                              NSW Fair Work AEO Voice Campaign
+                            </h5>
+                            <p className="text-[11px] text-slate-400 leading-normal font-sans">
+                              Targets high-intent queries regarding Fair Work compliance under modern awards in multi-tenancy spaces.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={runNswFairWorkCampaign}
+                            disabled={isCampaignExecuting !== null || nswFairWorkCampaignLaunched}
+                            className={`w-full py-2 px-3 rounded-xl font-bold text-[10px] uppercase tracking-wider cursor-pointer border transition-all ${
+                              nswFairWorkCampaignLaunched
+                                ? "bg-emerald-950/20 hover:bg-emerald-950/30 text-emerald-400 border-emerald-500/20"
+                                : "bg-slate-900 hover:bg-slate-855 text-white border-slate-800"
+                            }`}
+                          >
+                            {nswFairWorkCampaignLaunched ? "Voice Snippets Captured" : "Launch NSW Fair Work AEO Campaign"}
+                          </button>
+                        </div>
+
+                        {/* Task 4: St Kilda Coastal Scheme */}
+                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-850 flex flex-col justify-between gap-3 transition-colors hover:border-slate-800">
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center">
+                              <span className="font-mono text-[10px] font-extrabold text-indigo-400 uppercase tracking-widest">
+                                VIC Metro: Postcode 3182
+                              </span>
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black uppercase font-mono ${
+                                stKildaHygieneSchemeDeployed 
+                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" 
+                                  : "bg-slate-900 text-slate-500 border border-slate-800"
+                              }`}>
+                                {stKildaHygieneSchemeDeployed ? "✓ Coastal Scheme Active" : "● Ready"}
+                              </span>
+                            </div>
+                            <h5 className="font-extrabold text-white text-xs font-sans">
+                              St Kilda Beachside Hygiene Scheme
+                            </h5>
+                            <p className="text-[11px] text-slate-400 leading-normal font-sans">
+                              Deploys special allergen/mold prevention protocols, boosting localized Victoria conversions to 15.4%.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={runStKildaHygieneCampaign}
+                            disabled={isCampaignExecuting !== null || stKildaHygieneSchemeDeployed}
+                            className={`w-full py-2 px-3 rounded-xl font-bold text-[10px] uppercase tracking-wider cursor-pointer border transition-all ${
+                              stKildaHygieneSchemeDeployed
+                                ? "bg-emerald-950/20 hover:bg-emerald-950/30 text-emerald-400 border-emerald-500/20"
+                                : "bg-slate-900 hover:bg-slate-855 text-white border-slate-800"
+                            }`}
+                          >
+                            {stKildaHygieneSchemeDeployed ? "Coastal Guidelines Deployed" : "Deploy St Kilda Hygiene Guidelines"}
+                          </button>
+                        </div>
+
+                      </div>
+                    </div>
+
                     {/* TWO SECTION ROW: METRICS PANELS & STATE TAB VIEW */}
                     <div className="space-y-4">
                       {/* Interactive State Selector Tabs */}
                       <div className="flex flex-wrap gap-1.5 border-b border-slate-800/80 pb-2">
                         {((["WA", "NSW", "VIC", "QLD"] as const)).map(st => {
-                          const listLength = shootoutStateData[st]?.length || 0;
+                          const listLength = computedShootoutStateData[st]?.length || 0;
                           return (
                             <button
                               key={st}
@@ -1265,7 +2034,7 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
                         <div className="bg-slate-900 p-3 rounded-2xl border border-slate-850 text-center space-y-0.5">
                           <p className="text-[10px] text-slate-500 uppercase font-bold text-slate-505">Total Monthly Leads</p>
                           <p className="text-md md:text-lg font-black text-white">
-                            {shootoutStateData[shootoutSelectedStateTab]?.reduce((sum, item) => sum + item.leadVolume, 0).toLocaleString()}
+                            {computedShootoutStateData[shootoutSelectedStateTab]?.reduce((sum, item) => sum + item.leadVolume, 0).toLocaleString()}
                           </p>
                           <span className="text-[9px] text-slate-500 block">Organic Google Traffic</span>
                         </div>
@@ -1279,7 +2048,7 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
                         <div className="bg-slate-900 p-3 rounded-2xl border border-slate-855 text-center space-y-0.5">
                           <p className="text-[10px] text-slate-500 uppercase font-bold text-slate-505">Mean Citation Density</p>
                           <p className="text-md md:text-lg font-black text-indigo-300">
-                            {shootoutSelectedStateTab === "WA" ? "37.1" :
+                            {shootoutSelectedStateTab === "WA" ? (mandurahCitationsBoosted ? "38.0" : "37.1") :
                              shootoutSelectedStateTab === "NSW" ? "49.0" :
                              shootoutSelectedStateTab === "VIC" ? "47.0" : "42.3"}
                           </p>
@@ -1315,7 +2084,7 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-850/65">
-                              {shootoutStateData[shootoutSelectedStateTab]?.map((item, idx) => {
+                              {computedShootoutStateData[shootoutSelectedStateTab]?.map((item, idx) => {
                                 const isCurrentActiveScan = isStateShootoutActive && 
                                   shootoutSelectedStateTab === (shootoutCurrentStateIndex === 0 ? "WA" : shootoutCurrentStateIndex === 1 ? "NSW" : shootoutCurrentStateIndex === 2 ? "VIC" : "QLD") &&
                                   shootoutCurrentCouncilIndex === idx;
@@ -2351,6 +3120,144 @@ export default function SeoEEATCommand({ onTriggerLog }: SeoEEATCommandProps) {
             </div>
           </div>
 
+        </div>
+
+        {/* Floating Playbook Preset Library Controller */}
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 font-sans">
+          <AnimatePresence>
+            {showPresetLibrary && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                className="w-80 sm:w-96 bg-slate-950/95 backdrop-blur-md border border-indigo-505/30 rounded-3xl p-5 shadow-2xl space-y-4 text-left max-h-[70vh] overflow-y-auto"
+              >
+                <div className="flex items-center justify-between border-b border-indigo-500/20 pb-3">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-indigo-400" />
+                    <div>
+                      <h4 className="font-black text-xs text-white uppercase tracking-wider font-mono">
+                        📚 AASTACLEAN Playbook Presets
+                      </h4>
+                      <p className="text-[10px] text-indigo-300 font-mono">Expert Campaign Presets</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowPresetLibrary(false)}
+                    className="p-1.5 rounded-full bg-slate-900 border border-slate-850 hover:border-red-500/30 hover:text-red-400 text-slate-400 transition-colors cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-slate-450 leading-relaxed font-mono">
+                  Browse and trigger institutional-level tactical campaigns formulated by top industry leaders to boost regional indexing rates and command immediate E-E-A-T trust.
+                </p>
+
+                <div className="space-y-3">
+                  {[
+                    {
+                      id: "western_frontier",
+                      title: "The Western Frontier Campaign",
+                      tag: "WA EXPANSE",
+                      desc: "Inject regional directories, register Bunbury (6230) & Hillarys (6025), and lock in high-density local citation boosters (+45.2 WA).",
+                      blueprints: ["Bunbury (6230) Node Mapping", "Hillarys (6025) Geopoint", "Mandurah Citation Booster Sync"]
+                    },
+                    {
+                      id: "sovereign_shield",
+                      title: "The Sovereign Shield ISO Push",
+                      tag: "ISO STANDARD",
+                      desc: "Direct-inject triple-standard structural metadata parameters (ISO 9001, 145001, 45001) globally, raising E-E-A-T score to 99.8%.",
+                      blueprints: ["Occupational Health Schema", "SGN Environmental Ledger", "Audit Evidence JSON-LD"]
+                    },
+                    {
+                      id: "beachside_fortress",
+                      title: "The Beachside Fortress Scheme",
+                      tag: "COASTAL DEFENSE",
+                      desc: "Target waterfront postcodes with moisture-remediation and sea-salt deionisation schemas. Deploys Manly (2095) & St Kilda allergens.",
+                      blueprints: ["Allergy Specialist Alignment", "Manly (2095) Node Mapping", "Scarborough High-Moisture Directives"]
+                    },
+                    {
+                      id: "award_wage",
+                      title: "The Award Wage Fortress",
+                      tag: "COMPLIANCE SHIELD",
+                      desc: "Syncload modern award wage schedules into deep structured data parameters, shutting out high-liability subcontractor fraud.",
+                      blueprints: ["Cleaning Modern Award Wage Object", "Sydney CBD Fair Work Snippet Sync", "ASIC Registered Proprietor Schema"]
+                    },
+                    {
+                      id: "bento_enterprise",
+                      title: "Bento-Grid Enterprise Sweep",
+                      tag: "CREDENTIAL MATRIX",
+                      desc: "Binds police checks, federal security clearances, and $20M public liability certificates directly inside active JSON-LD graphs.",
+                      blueprints: ["Federal Police Check Ledger", "$20M Insurance Node Binding", "Asbestos-Safe Contractor PIN"]
+                    }
+                  ].map((p) => {
+                    const isActive = activePlaybookPresets.includes(p.id);
+                    return (
+                      <div
+                        key={p.id}
+                        className={`p-3.5 rounded-2xl border transition-all text-xs ${
+                          isActive
+                            ? "bg-indigo-950/20 border-indigo-500/40 shadow-indigo-500/5"
+                            : "bg-slate-900/60 border-slate-850 hover:border-slate-800"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-black text-indigo-400 font-mono tracking-wide">{p.title}</span>
+                          <span className="text-[8px] font-black bg-indigo-550/10 text-indigo-300 font-mono px-1.5 py-0.5 rounded-full border border-indigo-500/20">
+                            {p.tag}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-normal mb-1.5">{p.desc}</p>
+                        
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {p.blueprints.map((b, idx) => (
+                            <span key={idx} className="text-[8px] font-mono text-slate-505 bg-slate-950 px-1.5 py-0.5 rounded-md border border-slate-900">
+                              • {b}
+                            </span>
+                          ))}
+                        </div>
+
+                        <button
+                          onClick={() => injectPlaybookPreset(p.id)}
+                          className={`w-full py-1.5 px-3 rounded-xl font-bold font-mono text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                            isActive
+                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 cursor-default"
+                              : "bg-indigo-600 hover:bg-indigo-550 text-white"
+                          }`}
+                        >
+                          {isActive ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Scheme Active</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Deploy Playbook Scheme</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <button
+            onClick={() => setShowPresetLibrary(!showPresetLibrary)}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase tracking-widest px-4 py-3 rounded-full flex items-center gap-2 shadow-2xl border border-indigo-400/30 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+          >
+            <BookOpen className="w-4 h-4 text-emerald-400" />
+            <span>Playbook Presets</span>
+            {activePlaybookPresets.length > 0 && (
+              <span className="bg-emerald-400 text-slate-950 font-black text-[9px] w-5 h-5 rounded-full inline-flex items-center justify-center">
+                {activePlaybookPresets.length}
+              </span>
+            )}
+          </button>
         </div>
 
       </div>
