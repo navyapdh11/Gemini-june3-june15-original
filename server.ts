@@ -5,6 +5,7 @@ import { calculateQuote } from "./src/utils/PricingCalculator";
 import { SERVICE_METADATA } from "./src/config/ServiceCatalog";
 import { initQueueSystem, enqueueJob, getQueueStats, getJobLogs } from "./src/utils/queue";
 import jwt from "jsonwebtoken";
+import { HermesOrchestrator } from "./src/utils/AgentOrchestrator";
 
 const JWT_SECRET = process.env.JWT_SECRET || "aastaclean-v2-dev-secret";
 
@@ -55,8 +56,12 @@ async function startServer() {
 
   // Dynamic Gemini Enterprise Code Review Agent
   app.post("/api/v1/gemini/review", async (req, res) => {
+    const { query, suburb, postcode } = req.body;
+    const hermes = new HermesOrchestrator();
+    
     const geminiKey = process.env.GEMINI_API_KEY;
     if (!geminiKey) {
+      // ... (existing error handling)
       return res.status(200).json({
         success: false,
         error: "Missing API Key",
@@ -73,6 +78,14 @@ Since the live model connection requires an API configuration, here is our Austr
     }
 
     try {
+      // Hermes Orchestration with Semantic Grounding
+      const orchestratedPayload = await hermes.processRequest({
+        suburb: suburb || "Perth",
+        postcode: postcode || "6000",
+        query: query || "General Code Review",
+        contextBoundaries: {}
+      });
+
       const fs = await import("fs/promises");
       const { GoogleGenAI } = await import("@google/genai");
       const ai = new GoogleGenAI({ apiKey: geminiKey });
@@ -113,6 +126,9 @@ ${chunkApp}
 
 --- FILE: server.ts (Excerpt) ---
 ${chunkServer}
+
+--- SEMANTIC GROUNDING DATA ---
+${orchestratedPayload.groundedContext}
 
 --- COMPLIANCE OBJECTIVE ---
 Prepare a comprehensive, constructive developer review. Focus heavily on:
