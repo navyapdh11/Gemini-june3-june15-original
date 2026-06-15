@@ -7,6 +7,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 export interface AgentPayload {
   suburb: string;
   postcode: string;
+  stateCode: string; // Added for National Rollout
   query: string;
   contextBoundaries: Record<string, any>;
 }
@@ -16,8 +17,8 @@ export class SemanticGroundingService {
    * Performs semantic lookup in Supabase pgvector store.
    * Requires a 'match_documents' RPC function defined in Postgres.
    */
-  async groundQuery(query: string, postcode: string): Promise<string> {
-    console.log(`🔍 Semantic grounding for query: "${query}" in ${postcode}`);
+  async groundQuery(query: string, postcode: string, stateCode: string): Promise<string> {
+    console.log(`🔍 Semantic grounding for query: "${query}" in ${postcode} (${stateCode})`);
     
     // Generate embedding for query (requires a separate call to embedding model)
     // Stubbed embedding placeholder
@@ -25,7 +26,7 @@ export class SemanticGroundingService {
 
     const { data, error } = await supabase.rpc('match_documents', {
       query_embedding: embedding,
-      filter: { postcode: postcode },
+      filter: { postcode: postcode, state: stateCode }, // Updated state filter
       match_threshold: 0.7,
       match_count: 3,
     });
@@ -45,7 +46,7 @@ export class HyperlocalContextFilter {
    * In production, this uses Vercel Edge Config.
    */
   async applyFilter(payload: AgentPayload): Promise<AgentPayload> {
-    console.log(`📍 Filtering context for ${payload.suburb} (${payload.postcode})`);
+    console.log(`📍 Filtering context for ${payload.suburb} (${payload.postcode}, ${payload.stateCode})`);
     
     // Logic to ensure suburb/postcode match
     // Simplified constraint injection
@@ -53,7 +54,7 @@ export class HyperlocalContextFilter {
       ...payload,
       contextBoundaries: { 
         ...payload.contextBoundaries, 
-        jurisdiction: "AU-WA",
+        jurisdiction: `AU-${payload.stateCode}`, // Dynamic jurisdiction
         complianceTier: "High-Density-Urban" 
       }
     };

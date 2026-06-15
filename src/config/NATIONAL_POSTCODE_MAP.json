@@ -1,0 +1,20 @@
+{
+  "AU": {
+    "WA": {
+      "6000": "Perth CBD",
+      "6210": "Mandurah"
+    },
+    "NSW": {
+      "2000": "Sydney CBD",
+      "2026": "Bondi"
+    },
+    "VIC": {
+      "3000": "Melbourne CBD",
+      "3141": "South Yarra"
+    },
+    "QLD": {
+      "4000": "Brisbane CBD",
+      "4217": "Surfers Paradise"
+    }
+  }
+}

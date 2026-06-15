@@ -82,6 +82,7 @@ Since the live model connection requires an API configuration, here is our Austr
       const orchestratedPayload = await hermes.processRequest({
         suburb: suburb || "Perth",
         postcode: postcode || "6000",
+        stateCode: req.body.stateCode || "WA",
         query: query || "General Code Review",
         contextBoundaries: {}
       });

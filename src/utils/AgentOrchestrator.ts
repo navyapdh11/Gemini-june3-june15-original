@@ -8,7 +8,7 @@ export class HermesOrchestrator {
     // Parallel Execution for latency minimization
     const [filteredPayload, groundedContext] = await Promise.all([
       this.contextFilter.applyFilter(payload),
-      this.semanticService.groundQuery(payload.query, payload.postcode)
+      this.semanticService.groundQuery(payload.query, payload.postcode, payload.stateCode)
     ]);
 
     return {
