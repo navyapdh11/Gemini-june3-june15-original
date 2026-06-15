@@ -2,8 +2,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 async function generateSuburbPages() {
-  const data = JSON.parse(fs.readFileSync(path.join(process.cwd(), './src/config/WA_COMPETITIVE_DATA.json'), 'utf-8'));
-  console.log(`🚀 Hermes: Generating ${data.length} suburb-specific AEO-optimized pages with FAQ Injection...`);
+  const data = JSON.parse(fs.readFileSync(path.join(process.cwd(), './src/config/NATIONAL_COMPETITIVE_DATA.json'), 'utf-8'));
+  console.log(`🚀 Hermes: Generating ${data.length} suburb-specific AEO-optimized pages with FAQ Injection (National)...`);
 
   data.forEach((suburbData: any) => {
     const pageContent = `
@@ -26,7 +26,7 @@ ${suburbData.aeo_geo_strategy}
     fs.writeFileSync(path.join(process.cwd(), `./src/pages/suburbs/${suburbData.suburb.toLowerCase().replace(/\s/g, '-')}.md`), pageContent);
   });
   
-  console.log("✅ Suburb pages generated with AEO-optimized FAQ injection.");
+  console.log("✅ National suburb pages generated successfully.");
 }
 
 generateSuburbPages().catch(console.error);
