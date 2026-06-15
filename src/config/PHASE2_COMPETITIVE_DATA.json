@@ -1,0 +1,23 @@
+[
+  {
+    "suburb": "Sydney CBD",
+    "postcode": "2000",
+    "top_competitors": ["Maid2Match", "Jim's Cleaning", "Urban Clean"],
+    "niches": ["Corporate", "High-rise Resi"],
+    "aeo_geo_strategy": "FAQ Schema focus: 'Best corporate cleaning Sydney'. GEO sentiment emphasizes 'reliability'."
+  },
+  {
+    "suburb": "Melbourne CBD",
+    "postcode": "3000",
+    "top_competitors": ["Maid2Match", "Jim's Cleaning", "Urban Clean"],
+    "niches": ["Corporate", "Luxury Resi"],
+    "aeo_geo_strategy": "Focus on AEO for 'Fastest office cleaning Melbourne'. High GEO trust score needed."
+  },
+  {
+    "suburb": "Brisbane CBD",
+    "postcode": "4000",
+    "top_competitors": ["QLD Maid", "Jim's Cleaning", "Urban Clean"],
+    "niches": ["Corporate", "High-rise Resi"],
+    "aeo_geo_strategy": "AEO focus on 'Compliance cleaning Brisbane CBD'. GEO entity authority."
+  }
+]

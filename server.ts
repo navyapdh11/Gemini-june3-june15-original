@@ -4,6 +4,23 @@ import { createServer as createViteServer } from "vite";
 import { calculateQuote } from "./src/utils/PricingCalculator";
 import { SERVICE_METADATA } from "./src/config/ServiceCatalog";
 import { initQueueSystem, enqueueJob, getQueueStats, getJobLogs } from "./src/utils/queue";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.JWT_SECRET || "aastaclean-v2-dev-secret";
+
+const authenticateJWT = (req: any, res: any, next: any) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+      if (err) return res.sendStatus(403);
+      req.user = user;
+      next();
+    });
+  } else {
+    res.sendStatus(401);
+  }
+};
 
 async function startServer() {
   // Gracefully boot standard Redis/BullMQ (or In-Memory Fallback)
@@ -11,6 +28,25 @@ async function startServer() {
 
   const app = express();
   const PORT = 3000;
+
+  // Chatwoot Webhook Ingestion endpoint - moved to top
+  app.post("/api/v1/chatwoot/webhook", express.json(), (req, res) => {
+    const event = req.body;
+    
+    // Log for audit
+    console.log("📥 Chatwoot Webhook Event Received:", event.event);
+
+    if (event.event === "message_created") {
+      const contact = event.conversation?.contact_inbox?.contact;
+      if (contact) {
+        console.log(`👤 Contact updated: ${contact.email || contact.phone_number}`);
+        // Here we could trigger a background job to update our internal customer record
+        // via enqueueJob("update_customer_record", contact);
+      }
+    }
+
+    return res.status(200).json({ success: true, message: "Webhook processed." });
+  });
 
   // API HTML & JSON routes first
   app.get("/api/health", (req, res) => {
@@ -62,7 +98,7 @@ Since the live model connection requires an API configuration, here is our Austr
       const chunkServer = serverFileContent.slice(0, 16000);
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.0-flash",
         contents: [
           {
             role: "user",
@@ -127,6 +163,18 @@ Please ensure package imports and network bindings are fully synchronized.`
     } catch (err: any) {
       res.status(500).json({ error: "Failed to queue standard jobs", message: err.message });
     }
+  });
+
+  // Phase 4.1: Prototype Mobile API (Flutter-ready)
+  app.get("/api/v2/flutter/profile", authenticateJWT, (req: any, res) => {
+    res.json({
+      success: true,
+      user: req.user,
+      profile: {
+        name: "Test Mobile User",
+        membershipTier: "Gold-HACCP"
+      }
+    });
   });
 
   // 1. Enterprise Scalable API Gateway (For final pricing validation & CRM handshakes)
@@ -307,7 +355,13 @@ Please ensure package imports and network bindings are fully synchronized.`
   // Include Node.js Crypto module for the secure Admin Gateway proxy
   const crypto = await import("crypto");
   const ALGORITHM = "aes-256-cbc";
-  const ENCRYPTION_KEY = process.env.CORE_ENCRYPTION_SECRET || "d6f9b8c0a3e421d8b2f1a0e9c8d7b6a5";
+  const ENCRYPTION_KEY = process.env.CORE_ENCRYPTION_SECRET;
+  
+  if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 32) {
+    console.error("❌ CRITICAL: CORE_ENCRYPTION_SECRET must be a 32-character string. System shutdown initiated to protect credentials.");
+    process.exit(1);
+  }
+
   const IV_LENGTH = 16;
 
   function encryptCredential(text: string): string {
@@ -832,6 +886,25 @@ Please ensure package imports and network bindings are fully synchronized.`
     }
   });
 
+  // Chatwoot Webhook Ingestion endpoint
+  app.post("/api/v1/chatwoot/webhook", express.json(), (req, res) => {
+    const event = req.body;
+    
+    // Log for audit
+    console.log("📥 Chatwoot Webhook Event Received:", event.event);
+
+    if (event.event === "message_created") {
+      const contact = event.conversation?.contact_inbox?.contact;
+      if (contact) {
+        console.log(`👤 Contact updated: ${contact.email || contact.phone_number}`);
+        // Here we could trigger a background job to update our internal customer record
+        // via enqueueJob("update_customer_record", contact);
+      }
+    }
+
+    return res.status(200).json({ success: true, message: "Webhook processed." });
+  });
+
   // Chatwoot Inbox & Message Agent broker with dynamic Gemini support fallback
   app.post("/api/v1/chatwoot/message", express.json(), async (req, res) => {
     const { text, clientView } = req.body;
@@ -872,7 +945,7 @@ Reply with a professional, friendly, objective Australian-styled support respons
 Offer helpful automated steps, guidelines on bio-cleansing sanitisation, or postcode operations (e.g. Subiaco 6008, Mandurah 6210, Perth 6000).`;
 
         const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
+          model: "gemini-2.0-flash",
           contents: [
             { role: "user", parts: [{ text: `System context: ${systemPrompt}\nUser prompt: ${text}` }] }
           ]

@@ -170,17 +170,16 @@ export async function getPhotosFromDB(quoteId: string, type: "before" | "after")
     return new Promise((resolve, reject) => {
       const transaction = db.transaction("photos", "readonly");
       const store = transaction.objectStore("photos");
+      const index = store.index("by_quoteId");
       
       const photos: OfflinePhoto[] = [];
-      
-      // Use index or cursor to scan records
-      const request = store.openCursor();
+      const request = index.openCursor(IDBKeyRange.only(quoteId));
 
       request.onsuccess = (event) => {
         const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result;
         if (cursor) {
           const value = cursor.value as OfflinePhoto;
-          if (value.quoteId === quoteId && value.type === type) {
+          if (value.type === type) {
             photos.push(value);
           }
           cursor.continue();

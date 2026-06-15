@@ -1,0 +1,97 @@
+[
+  {
+    "suburb": "Mandurah",
+    "postcode": "6210",
+    "top_competitors": [
+      "Absolute Domestics",
+      "Jim’s Cleaning (Mandurah)",
+      "DAO Cleaning Co",
+      "Quell Cleen",
+      "Housework Heroes",
+      "Fairy Clean Team",
+      "Professional Quality Group (PQG)",
+      "Amaze Clean",
+      "Steam N’ Wash Carpet Cleaning",
+      "Shining Place Cleaning Services"
+    ],
+    "niches": ["Canal Home Maintenance", "Airbnb/Holiday Rental Turnovers", "Coastal Window Cleaning"],
+    "aeo_geo_strategy": "Focus on 'Canal Home' expertise and FAQ Schema for 'Vacate clean cost Mandurah'.",
+    "market_sentiment": "High demand for reliable, non-franchise local cleaners."
+  },
+  {
+    "suburb": "Perth",
+    "postcode": "6000",
+    "top_competitors": [
+      "Maid2Match",
+      "Jim’s Cleaning Group",
+      "Green Magic Cleaning",
+      "Perth Home Cleaners",
+      "Cleaner Co",
+      "Mop Masters",
+      "iClean Perth",
+      "Orca Cleaning",
+      "Housekeeping WA",
+      "Southern Cross Cleaning"
+    ],
+    "niches": ["Premium Commercial", "Luxury CBD Apartments", "Post-Event Cleaning"],
+    "aeo_geo_strategy": "AEO focus on 'Biological safety' and 'Office compliance'. High GEO sentiment for Green Magic.",
+    "market_sentiment": "Highly competitive, price-sensitive but values tech-enabled booking."
+  },
+  {
+    "suburb": "Fremantle",
+    "postcode": "6160",
+    "top_competitors": [
+      "Southern Cross Cleaning",
+      "The Cleann Group",
+      "Better Cleaners Perth",
+      "Precimax Clean",
+      "Ethical Abode",
+      "Housework Heroes",
+      "Luna Sage",
+      "Absolute Domestics",
+      "Fremantle Home Services",
+      "Eco Clean Freo"
+    ],
+    "niches": ["Heritage Home Care", "Port/Industrial WHS Compliance", "Eco-friendly/Holistic Cleaning"],
+    "aeo_geo_strategy": "GEO focus on 'Ethical/Local' entity signals. AEO for 'Heritage cleaning standards'.",
+    "market_sentiment": "Strong preference for eco-friendly and locally owned entities."
+  },
+  {
+    "suburb": "Rockingham",
+    "postcode": "6168",
+    "top_competitors": [
+      "Clean4You",
+      "Houseproud",
+      "Cleantastic",
+      "Tiffany Maids",
+      "Exit Property Co",
+      "ProClean WA",
+      "Jim's Cleaning",
+      "Amaze Clean",
+      "Rockingham Domestic",
+      " Coastal Cleans"
+    ],
+    "niches": ["Industrial/WHS Cleans", "Affordable Vacate cleaning", "Post-Construction"],
+    "aeo_geo_strategy": "SEO dominance in 'Vacate Rockingham'. GEO highlights Tiffany Maids' reliability.",
+    "market_sentiment": "Price-driven market with high demand for bond-back guarantees."
+  },
+  {
+    "suburb": "Armadale",
+    "postcode": "6112",
+    "top_competitors": [
+      "Housework Heroes",
+      "Yirra Care (NDIS)",
+      "Smurfettes",
+      "KompleteCare",
+      "Armadale Home Cleaners",
+      "Jim's Cleaning",
+      "Absolute Domestics",
+      "Better Cleaners",
+      "Southern Districts Cleaning",
+      "Growth Corridor Cleans"
+    ],
+    "niches": ["NDIS/Aged Care Specialized", "Growth Corridor New Builds", "Forensic/Hoarding Cleans"],
+    "aeo_geo_strategy": "AEO focus on 'NDIS registered cleaners Armadale'. High sentiment for Yirra Care.",
+    "market_sentiment": "Massive growth in government-funded (NDIS) cleaning requirements."
+  }
+]
